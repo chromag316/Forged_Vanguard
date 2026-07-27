@@ -1,0 +1,30 @@
+# World of Warcraft local client data
+WTF/
+Cache/
+Logs/
+Errors/
+
+# If this repo is placed inside Interface/AddOns, avoid nesting copies
+Interface/AddOns/
+
+# Lua bytecode and temp artifacts
+*.luac
+*.tmp
+*.bak
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor and tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test and coverage outputs
+coverage/
+.nyc_output/

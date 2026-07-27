@@ -1,0 +1,10 @@
+## Interface: 11200
+## Title: |cfff07d30Forged|r Mangosbot
+## Author: Chromag
+## Version: 0.1.0
+## Website: https://forgedworlds.com
+## Email: chromag@forgedworlds.com
+## Notes: 
+## Dependencies: Mangosbot
+
+core.lua
