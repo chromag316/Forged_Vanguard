@@ -221,8 +221,9 @@ local function CommandBook_CreateGridButton(parent, index)
     local button = CreateFrame("Button", nil, parent)
     button:SetWidth(44)
     button:SetHeight(44)
-    button:RegisterForClicks("LeftButtonUp")
-    button:RegisterForDrag("LeftButton")
+    button:EnableMouse(true)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForDrag("LeftButton", "RightButton")
 
     button:SetBackdrop({
         bgFile = "Interface/Buttons/WHITE8X8",
@@ -251,6 +252,8 @@ local function CommandBook_CreateGridButton(parent, index)
 
         GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
         GameTooltip:SetText(this.def.tooltip or this.def.id)
+        GameTooltip:AddLine("Left-click and drag: place on action bar", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Right-click: execute", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
 
@@ -260,7 +263,9 @@ local function CommandBook_CreateGridButton(parent, index)
 
     button:SetScript("OnClick", function()
         if this.def then
-            CommandBook_RunVisual(this.def, this)
+            if arg1 == "RightButton" then
+                CommandBook_RunVisual(this.def, this)
+            end
         end
     end)
 

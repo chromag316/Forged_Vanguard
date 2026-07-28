@@ -4,6 +4,7 @@ local MacroBridge = {}
 local MACRO_PREFIX = "FMB_"
 local MAX_TOTAL_MACROS = 36
 local DEFAULT_ICON = "INV_Misc_QuestionMark"
+local DEFAULT_ICON_INDEX = 1
 
 Forged_Mangosbot.MacroBridge = MacroBridge
 
@@ -37,6 +38,11 @@ end
 
 local function MacroBridge_MacroBodyForId(id)
     return "/script Forged_Mangosbot_Run(\"" .. id .. "\")"
+end
+
+local function MacroBridge_CreateMacroCompat(name, body, perCharacter)
+    local isLocal = false
+    return CreateMacro(name, DEFAULT_ICON_INDEX, body, isLocal, perCharacter)
 end
 
 local function MacroBridge_GetStoragePreference()
@@ -139,11 +145,10 @@ function MacroBridge.GetOrCreateMacro(id)
 
     local macroName = MacroBridge_MacroNameForId(id)
     local macroBody = MacroBridge_MacroBodyForId(id)
-    local macroIcon = MacroBridge_ResolveIcon(def)
 
     local existingByName = GetMacroIndexByName(macroName)
     if existingByName and existingByName > 0 then
-        EditMacro(existingByName, macroName, macroIcon, macroBody)
+        EditMacro(existingByName, macroName, DEFAULT_ICON_INDEX, macroBody)
         Forged_MangosbotMacroDB[id] = macroName
         return existingByName
     end
@@ -154,9 +159,12 @@ function MacroBridge.GetOrCreateMacro(id)
         return nil
     end
 
-    local macroIndex = CreateMacro(macroName, macroIcon, macroBody, perCharacter)
+    local macroIndex = MacroBridge_CreateMacroCompat(macroName, macroBody, perCharacter)
     if not macroIndex or macroIndex == 0 then
-        macroIndex = CreateMacro(macroName, DEFAULT_ICON, macroBody, perCharacter)
+        macroIndex = MacroBridge_CreateMacroCompat(macroName, macroBody, false)
+    end
+    if not macroIndex or macroIndex == 0 then
+        macroIndex = MacroBridge_CreateMacroCompat(macroName, macroBody, true)
     end
 
     if macroIndex and macroIndex > 0 then
@@ -172,6 +180,8 @@ function MacroBridge.PickUp(id)
     local macroIndex = MacroBridge.GetOrCreateMacro(id)
     if macroIndex and macroIndex > 0 then
         PickupMacro(macroIndex)
+    else
+        MacroBridge_Print("Forged_Mangosbot: could not pick up companion command macro.")
     end
 end
 

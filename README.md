@@ -1,6 +1,6 @@
 # Forged_Mangosbot
 
-Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depends on Mangosbot and replaces Mangosbot's default command windows with a Spellbook-style companion command book.
+Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depends on Mangosbot and provides a Spellbook-style companion command book while extending Mangosbot's bot selection UX.
 
 ## Dependency
 
@@ -23,6 +23,13 @@ Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depend
 - Displays commands in a tabbed, paged icon book.
 - Click execution uses Mangosbot ToolBarButtonOnClick behavior.
 - Dragging a command creates or reuses a macro and places it on the cursor for action bars.
+
+## Bot Selection and Portrait Menu
+
+- Clicking a bot character no longer auto-opens Mangosbot's Selected Bot command window.
+- Right-clicking the selected character portrait now includes a `Command` menu entry when the unit is recognized as a bot.
+- Selecting `Command` opens Mangosbot's legacy Selected Bot command window on demand.
+- The Forged command book is still available via `/forgedbot`, `/fmb`, and keybinds.
 
 ## Macro Slot Constraint (WoW 1.12)
 
