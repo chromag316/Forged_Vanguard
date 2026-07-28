@@ -1,0 +1,8 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="Forged_Mangosbot.lua"/>
+    <Script file="Registry.lua"/>
+    <Script file="MacroBridge.lua"/>
+    <Script file="UI/CompanionPanel.lua"/>
+    <Script file="UI/CommandBook.lua"/>
+    <Include file="UI/CommandBook.xml"/>
+</Ui>

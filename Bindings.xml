@@ -1,0 +1,14 @@
+<Bindings>
+    <Binding name="FORGED_MANGOSBOT_TOGGLE" header="FORGED_MANGOSBOT">
+        Forged_Mangosbot_ToggleCommandBook();
+    </Binding>
+    <Binding name="FORGED_MANGOSBOT_FOLLOW">
+        Forged_Mangosbot_BindingFollow();
+    </Binding>
+    <Binding name="FORGED_MANGOSBOT_STAY">
+        Forged_Mangosbot_BindingStay();
+    </Binding>
+    <Binding name="FORGED_MANGOSBOT_LOOT">
+        Forged_Mangosbot_BindingLoot();
+    </Binding>
+</Bindings>

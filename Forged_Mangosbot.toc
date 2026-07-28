@@ -1,10 +1,12 @@
 ## Interface: 11200
 ## Title: |cfff07d30Forged|r Mangosbot
-## Author: Chromag
+## Notes: Spellbook-style command window and drag-to-actionbar UI for Mangosbot
+## Author: Copilot
 ## Version: 0.1.0
+## Dependencies: Mangosbot
+## SavedVariables: Forged_MangosbotMacroDB
 ## Website: https://forgedworlds.com
 ## Email: chromag@forgedworlds.com
-## Notes: 
-## Dependencies: Mangosbot
 
-core.lua
+Forged_Mangosbot.xml
+Bindings.xml
