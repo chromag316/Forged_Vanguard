@@ -3,6 +3,6 @@
     <Script file="Registry.lua"/>
     <Script file="MacroBridge.lua"/>
     <Script file="UI/CompanionPanel.lua"/>
-    <Script file="UI/CommandBook.lua"/>
-    <Include file="UI/CommandBook.xml"/>
+    <Script file="UI/BookOfCommands.lua"/>
+    <Include file="UI/BookOfCommands.xml"/>
 </Ui>

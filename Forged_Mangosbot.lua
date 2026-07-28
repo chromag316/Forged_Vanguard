@@ -1,7 +1,7 @@
 Forged_Mangosbot = Forged_Mangosbot or {}
 
 BINDING_HEADER_FORGED_MANGOSBOT = "Forged Mangosbot"
-BINDING_NAME_FORGED_MANGOSBOT_TOGGLE = "Toggle Companion Command Book"
+BINDING_NAME_FORGED_MANGOSBOT_TOGGLE = "Toggle Book of Commands"
 BINDING_NAME_FORGED_MANGOSBOT_FOLLOW = "Companion follow"
 BINDING_NAME_FORGED_MANGOSBOT_STAY = "Companion stay"
 BINDING_NAME_FORGED_MANGOSBOT_LOOT = "Companion loot"
@@ -21,367 +21,129 @@ local function Forged_Mangosbot_Print(message)
     end
 end
 
-local function Forged_Mangosbot_EnsureCommandBookFallback()
-    Forged_Mangosbot.CommandBook = Forged_Mangosbot.CommandBook or {}
+local function Forged_Mangosbot_ResolveBookOfCommandsHandlers()
+    local initFn = nil
+    local toggleFn = nil
 
-    local fallbackFrame = nil
-    local fallbackButtons = {}
-    local fallbackTabs = {}
-    local fallbackCategory = "movement"
-    local fallbackPage = 1
-    local fallbackPerPage = 16
-    local fallbackCategories = {
-        { key = "movement", label = "Movement" },
-        { key = "formation", label = "Formation" },
-        { key = "stance", label = "Stance" },
-        { key = "combat", label = "Combat" },
-        { key = "non_combat", label = "Non-Combat" },
-        { key = "save_mana", label = "Save Mana" },
-        { key = "rti", label = "RTI" },
-        { key = "rti_cc", label = "RTI-CC" },
-        { key = "actions", label = "Actions" },
-        { key = "inventory", label = "Inventory" },
-        { key = "companions", label = "Companions" }
-    }
-
-    local function Fallback_ResolveIcon(def)
-        if not def or not def.icon then
-            return "Interface\\Icons\\INV_Misc_QuestionMark"
+    local module = Forged_Mangosbot.BookOfCommands
+    if type(module) == "table" then
+        if type(module.Init) == "function" then
+            initFn = module.Init
         end
-        local icon = def.icon
-        if string.find(icon, "\\") or string.find(icon, "/") or string.find(icon, "%.") then
-            return icon
+        if type(module.Toggle) == "function" then
+            toggleFn = module.Toggle
         end
-        return "Interface\\Addons\\Mangosbot\\Images\\" .. icon .. ".tga"
     end
 
-    local function Fallback_GetCommands()
-        local list = {}
-        local registry = Forged_Mangosbot.Registry
-        local all = registry and registry.GetAll and registry.GetAll() or {}
-        local id, def
-        for id, def in pairs(all) do
-            if def.category == fallbackCategory then
-                table.insert(list, def)
-            end
-        end
-        table.sort(list, function(a, b)
-            local ai = a.index or 0
-            local bi = b.index or 0
-            if ai == bi then
-                return a.id < b.id
-            end
-            return ai < bi
-        end)
-        return list
+    if not initFn and type(Forged_Mangosbot_BookOfCommands_Init) == "function" then
+        initFn = Forged_Mangosbot_BookOfCommands_Init
+    end
+    if not toggleFn and type(Forged_Mangosbot_BookOfCommands_Toggle) == "function" then
+        toggleFn = Forged_Mangosbot_BookOfCommands_Toggle
     end
 
-    local function Fallback_Update()
-        if not fallbackFrame then
+    if (not initFn or not toggleFn) and type(dofile) == "function" then
+        pcall(dofile, "Interface\\AddOns\\Forged_Mangosbot\\UI\\BookOfCommands.lua")
+        if not initFn and type(Forged_Mangosbot_BookOfCommands_Init) == "function" then
+            initFn = Forged_Mangosbot_BookOfCommands_Init
+        end
+        if not toggleFn and type(Forged_Mangosbot_BookOfCommands_Toggle) == "function" then
+            toggleFn = Forged_Mangosbot_BookOfCommands_Toggle
+        end
+    end
+
+    if initFn and toggleFn then
+        Forged_Mangosbot.BookOfCommands = Forged_Mangosbot.BookOfCommands or {}
+        Forged_Mangosbot.BookOfCommands.Init = initFn
+        Forged_Mangosbot.BookOfCommands.Toggle = toggleFn
+        return initFn, toggleFn
+    end
+
+    return nil, nil
+end
+
+local function Forged_Mangosbot_InstallXmlBookOfCommandsHandlers()
+    local frameName = "Forged_Mangosbot_BookOfCommandsFrame"
+
+    local function initFn()
+        local frame = getglobal(frameName)
+        if not frame then
+            return nil
+        end
+
+        if type(UIPanelWindows) == "table" then
+            UIPanelWindows[frameName] = {
+                area = "left",
+                pushable = 0,
+                xoffset = 0,
+                yoffset = 0,
+                whileDead = 1
+            }
+        end
+
+        frame:SetMovable(false)
+        frame:RegisterForDrag()
+        frame:SetScript("OnDragStart", nil)
+        frame:SetScript("OnDragStop", nil)
+        frame:SetClampedToScreen(true)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+
+        return frame
+    end
+
+    local function toggleFn()
+        local frame = getglobal(frameName)
+        if not frame then
+            Forged_Mangosbot_Print("Forged_Mangosbot: missing frame '" .. frameName .. "'.")
             return
         end
 
-        local i
-        for i = 1, table.getn(fallbackTabs) do
-            local tab = fallbackTabs[i]
-            if tab.categoryKey == fallbackCategory then
-                tab:SetBackdropColor(0.30, 0.20, 0.05, 0.95)
+        if frame:IsVisible() then
+            if type(HideUIPanel) == "function" then
+                HideUIPanel(frame)
             else
-                tab:SetBackdropColor(0.10, 0.10, 0.10, 0.85)
-            end
-        end
-
-        if fallbackCategory == "companions" then
-            fallbackFrame.gridContainer:Hide()
-            fallbackFrame.companionContainer:Show()
-
-            if fallbackFrame.prevButton then
-                fallbackFrame.prevButton:Disable()
-            end
-            if fallbackFrame.nextButton then
-                fallbackFrame.nextButton:Disable()
-            end
-
-            if fallbackFrame.pageText then
-                fallbackFrame.pageText:SetText("Companions")
-            end
-
-            if Forged_Mangosbot.CompanionPanel and Forged_Mangosbot.CompanionPanel.Init then
-                Forged_Mangosbot.CompanionPanel.Init(fallbackFrame.companionContainer)
-                Forged_Mangosbot.CompanionPanel.Refresh()
-            end
-            return
-        end
-
-        fallbackFrame.gridContainer:Show()
-        fallbackFrame.companionContainer:Hide()
-
-        local commands = Fallback_GetCommands()
-        local maxPage = math.max(1, math.ceil(table.getn(commands) / fallbackPerPage))
-        if fallbackPage > maxPage then
-            fallbackPage = maxPage
-        end
-
-        if fallbackFrame.pageText then
-            fallbackFrame.pageText:SetText("Page " .. fallbackPage .. "/" .. maxPage)
-        end
-
-        if fallbackFrame.prevButton then
-            if fallbackPage > 1 then
-                fallbackFrame.prevButton:Enable()
-            else
-                fallbackFrame.prevButton:Disable()
-            end
-        end
-
-        if fallbackFrame.nextButton then
-            if fallbackPage < maxPage then
-                fallbackFrame.nextButton:Enable()
-            else
-                fallbackFrame.nextButton:Disable()
-            end
-        end
-
-        for i = 1, table.getn(fallbackButtons) do
-            local idx = (fallbackPage - 1) * fallbackPerPage + i
-            local def = commands[idx]
-            local button = fallbackButtons[i]
-            if def then
-                button.def = def
-                button.icon:SetTexture(Fallback_ResolveIcon(def))
-                button:Show()
-            else
-                button.def = nil
-                button:Hide()
-            end
-        end
-    end
-
-    local function Fallback_CreateFrame()
-        local existing = getglobal("Forged_Mangosbot_CommandBookFrame")
-        if existing then
-            return existing
-        end
-
-        local f = CreateFrame("Frame", "Forged_Mangosbot_CommandBookFrame", UIParent)
-        f:SetWidth(560)
-        f:SetHeight(440)
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        f:SetFrameStrata("DIALOG")
-        f:EnableMouse(true)
-        f:SetMovable(true)
-        f:Hide()
-        f:SetBackdrop({
-            bgFile = "Interface/Spellbook/UI-SpellBook-Background",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-            tile = false,
-            tileSize = 16,
-            edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 }
-        })
-
-        local title = f:CreateFontString("Forged_Mangosbot_CommandBookFrameTitle", "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOP", f, "TOP", 0, -14)
-        title:SetText("Companion Abilities")
-
-        local pageText = f:CreateFontString("Forged_Mangosbot_CommandBookFramePageText", "OVERLAY", "GameFontHighlightSmall")
-        pageText:SetPoint("BOTTOM", f, "BOTTOM", 0, 18)
-        f.pageText = pageText
-
-        local close = CreateFrame("Button", "Forged_Mangosbot_CommandBookFrameClose", f, "UIPanelCloseButton")
-        close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
-
-        local tabContainer = CreateFrame("Frame", "Forged_Mangosbot_CommandBookFrameTabContainer", f)
-        tabContainer:SetWidth(120)
-        tabContainer:SetHeight(360)
-        tabContainer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -48)
-
-        local grid = CreateFrame("Frame", "Forged_Mangosbot_CommandBookFrameGridContainer", f)
-        grid:SetWidth(400)
-        grid:SetHeight(320)
-        grid:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -52)
-        grid:SetBackdrop({
-            bgFile = "Interface/Spellbook/UI-SpellBook-Background",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-            tile = false,
-            tileSize = 16,
-            edgeSize = 8,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 }
-        })
-        grid:SetBackdropColor(0.2, 0.16, 0.08, 0.95)
-
-        f.gridContainer = grid
-
-        local companions = CreateFrame("Frame", "Forged_Mangosbot_CommandBookFrameCompanionContainer", f)
-        companions:SetWidth(400)
-        companions:SetHeight(320)
-        companions:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -52)
-        companions:SetBackdrop({
-            bgFile = "Interface/Spellbook/UI-SpellBook-Background",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-            tile = false,
-            tileSize = 16,
-            edgeSize = 8,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 }
-        })
-        companions:SetBackdropColor(0.2, 0.16, 0.08, 0.95)
-        companions:Hide()
-
-        f.companionContainer = companions
-
-        local prev = CreateFrame("Button", "Forged_Mangosbot_CommandBookFramePrevPage", f, "UIPanelButtonTemplate")
-        prev:SetWidth(26)
-        prev:SetHeight(22)
-        prev:SetPoint("BOTTOMLEFT", grid, "BOTTOMLEFT", 120, -28)
-        prev:SetText("<")
-        prev:SetScript("OnClick", function()
-            if fallbackPage > 1 then
-                fallbackPage = fallbackPage - 1
-                Fallback_Update()
-            end
-        end)
-
-        f.prevButton = prev
-
-        local next = CreateFrame("Button", "Forged_Mangosbot_CommandBookFrameNextPage", f, "UIPanelButtonTemplate")
-        next:SetWidth(26)
-        next:SetHeight(22)
-        next:SetPoint("BOTTOMRIGHT", grid, "BOTTOMRIGHT", -120, -28)
-        next:SetText(">")
-        next:SetScript("OnClick", function()
-            fallbackPage = fallbackPage + 1
-            Fallback_Update()
-        end)
-
-        f.nextButton = next
-
-        local i
-        for i = 1, table.getn(fallbackCategories) do
-            local cat = fallbackCategories[i]
-            local tab = CreateFrame("Button", nil, tabContainer, "UIPanelButtonTemplate")
-            tab:SetWidth(112)
-            tab:SetHeight(22)
-            tab:SetPoint("TOPLEFT", tabContainer, "TOPLEFT", 0, -(i - 1) * 24)
-            tab:SetText(cat.label)
-            if tab.SetNormalFontObject then
-                tab:SetNormalFontObject(GameFontHighlightSmall)
-            end
-            tab:SetBackdrop({
-                bgFile = "Interface/Buttons/WHITE8X8",
-                edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-                tile = true,
-                tileSize = 8,
-                edgeSize = 8,
-                insets = { left = 2, right = 2, top = 2, bottom = 2 }
-            })
-            tab:SetBackdropBorderColor(0.25, 0.18, 0.10, 1.0)
-            tab:SetBackdropColor(0.10, 0.10, 0.10, 0.85)
-            tab.categoryKey = cat.key
-            tab:SetScript("OnClick", function()
-                fallbackCategory = this.categoryKey
-                fallbackPage = 1
-                Fallback_Update()
-            end)
-
-            fallbackTabs[i] = tab
-        end
-
-        for i = 1, fallbackPerPage do
-            local button = CreateFrame("Button", nil, grid)
-            button:SetWidth(56)
-            button:SetHeight(56)
-            local col = math.mod(i - 1, 4)
-            local row = math.floor((i - 1) / 4)
-            button:SetPoint("TOPLEFT", grid, "TOPLEFT", 24 + col * 92, -22 - row * 74)
-            button:EnableMouse(true)
-            button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-            button:RegisterForDrag("LeftButton", "RightButton")
-            button:SetBackdrop({
-                bgFile = "Interface/Buttons/WHITE8X8",
-                edgeFile = "Interface/Buttons/UI-Quickslot2",
-                tile = true,
-                tileSize = 8,
-                edgeSize = 16,
-                insets = { left = 3, right = 3, top = 3, bottom = 3 }
-            })
-            button:SetBackdropColor(0, 0, 0, 0.35)
-
-            button.icon = button:CreateTexture(nil, "ARTWORK")
-            button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 6, -6)
-            button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -6, 6)
-            button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-
-            button:SetScript("OnEnter", function()
-                if this.def then
-                    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-                    GameTooltip:SetText(this.def.tooltip or this.def.id)
-                    GameTooltip:AddLine("Left-click and drag: place on action bar", 0.8, 0.8, 0.8)
-                    GameTooltip:AddLine("Right-click: execute", 0.8, 0.8, 0.8)
-                    GameTooltip:Show()
-                end
-            end)
-            button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            button:SetScript("OnClick", function()
-                if this.def then
-                    if arg1 == "RightButton" then
-                        ToolBarButtonOnClick(this.def, false)
-                    end
-                end
-            end)
-            button:SetScript("OnDragStart", function()
-                if this.def and Forged_Mangosbot.MacroBridge and Forged_Mangosbot.MacroBridge.PickUp then
-                    Forged_Mangosbot.MacroBridge.PickUp(this.def.id)
-                end
-            end)
-
-            fallbackButtons[i] = button
-        end
-
-        if type(EnablePositionSaving) == "function" then
-            EnablePositionSaving(f, "Forged_Mangosbot_CommandBookFrame")
-        else
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function() this:StartMoving() end)
-            f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-        end
-
-        return f
-    end
-
-    if not Forged_Mangosbot.CommandBook.Init then
-        Forged_Mangosbot.CommandBook.Init = function()
-            fallbackFrame = fallbackFrame or Fallback_CreateFrame()
-            if not fallbackFrame then
-                Forged_Mangosbot_Print("Forged_Mangosbot: command book frame is missing. Reload UI and check XML load errors.")
-                return
-            end
-            Fallback_Update()
-            return fallbackFrame
-        end
-    end
-
-    if not Forged_Mangosbot.CommandBook.Toggle then
-        Forged_Mangosbot.CommandBook.Toggle = function()
-            local frame = fallbackFrame
-            if Forged_Mangosbot.CommandBook.Init then
-                frame = Forged_Mangosbot.CommandBook.Init()
-            end
-            if not frame then
-                frame = getglobal("Forged_Mangosbot_CommandBookFrame")
-            end
-            if not frame then
-                Forged_Mangosbot_Print("Forged_Mangosbot: command book is unavailable. UI module may not have loaded.")
-                return
-            end
-
-            if frame:IsVisible() then
                 frame:Hide()
+            end
+        else
+            if type(ShowUIPanel) == "function" then
+                ShowUIPanel(frame)
+                if type(UpdateUIPanelPositions) == "function" then
+                    UpdateUIPanelPositions()
+                end
             else
                 frame:Show()
-                Fallback_Update()
             end
         end
     end
+
+    local frame = getglobal(frameName)
+    if not frame then
+        return nil, nil
+    end
+
+    Forged_Mangosbot.BookOfCommands = Forged_Mangosbot.BookOfCommands or {}
+    Forged_Mangosbot.BookOfCommands.Init = initFn
+    Forged_Mangosbot.BookOfCommands.Toggle = toggleFn
+
+    return initFn, toggleFn
+end
+
+local function Forged_Mangosbot_ValidateBookOfCommandsModule()
+    local initFn, toggleFn = Forged_Mangosbot_ResolveBookOfCommandsHandlers()
+    if not initFn or not toggleFn then
+        initFn, toggleFn = Forged_Mangosbot_InstallXmlBookOfCommandsHandlers()
+    end
+    if not initFn or not toggleFn then
+        local loadedFlag = tostring(Forged_Mangosbot_BookOfCommands_Loaded)
+        local initFlag = tostring(type(Forged_Mangosbot_BookOfCommands_Init) == "function")
+        local toggleFlag = tostring(type(Forged_Mangosbot_BookOfCommands_Toggle) == "function")
+        local frameLoadedFlag = tostring(Forged_Mangosbot_BookOfCommands_FrameLoaded)
+        Forged_Mangosbot_Print("Forged_Mangosbot: Book of Commands module did not load. loaded=" .. loadedFlag .. " init=" .. initFlag .. " toggle=" .. toggleFlag .. " frameLoaded=" .. frameLoadedFlag .. ". Check BookOfCommands.lua and BookOfCommands.xml.")
+        return false, nil, nil
+    end
+
+    return true, initFn, toggleFn
 end
 
 local function Forged_Mangosbot_DependencyReady()
@@ -570,7 +332,10 @@ local function Forged_Mangosbot_SetupSlashCommands()
     SLASH_FORGEDMANGOSBOT1 = "/forgedbot"
     SLASH_FORGEDMANGOSBOT2 = "/fmb"
     SlashCmdList.FORGEDMANGOSBOT = function()
-        Forged_Mangosbot_EnsureCommandBookFallback()
+        local ok, initFn, toggleFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+        if not ok then
+            return
+        end
 
         if not Forged_Mangosbot_DependencyReady() then
             Forged_Mangosbot_Print("Forged_Mangosbot requires Mangosbot to be installed and enabled.")
@@ -585,7 +350,7 @@ local function Forged_Mangosbot_SetupSlashCommands()
             Forged_Mangosbot_Initialize()
         end
 
-        Forged_Mangosbot.CommandBook.Toggle()
+        toggleFn()
     end
 end
 
@@ -604,8 +369,9 @@ function Forged_Mangosbot_Initialize()
         Forged_Mangosbot.MacroBridge.Cleanup()
     end
 
-    if Forged_Mangosbot.CommandBook and Forged_Mangosbot.CommandBook.Init then
-        Forged_Mangosbot.CommandBook.Init()
+    local ok, initFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+    if ok then
+        initFn()
     end
 
     if type(SelectedBotPanel) == "table" and type(SelectedBotPanel.Hide) == "function" then
@@ -615,9 +381,10 @@ function Forged_Mangosbot_Initialize()
     Forged_Mangosbot_HookUnitPopupMenu()
 end
 
-function Forged_Mangosbot_ToggleCommandBook()
-    if Forged_Mangosbot.CommandBook and Forged_Mangosbot.CommandBook.Toggle then
-        Forged_Mangosbot.CommandBook.Toggle()
+function Forged_Mangosbot_ToggleBookOfCommands()
+    local ok, _, toggleFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+    if ok then
+        toggleFn()
     end
 end
 
@@ -652,7 +419,6 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:SetScript("OnEvent", function()
     if event == "ADDON_LOADED" and arg1 == addonName then
-        Forged_Mangosbot_EnsureCommandBookFallback()
         Forged_Mangosbot_SetupSlashCommands()
 
         if not Forged_Mangosbot_DependencyReady() then

@@ -1,0 +1,115 @@
+<Ui
+    xmlns="http://www.blizzard.com/wow/ui/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd"
+>
+    <Frame name="Forged_Mangosbot_BookOfCommandsFrame" parent="UIParent" hidden="true" movable="false" enableMouse="true" toplevel="true">
+        <Size>
+            <AbsDimension x="540" y="440"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Layers>
+            <Layer level="BACKGROUND">
+                <Texture name="$parentTopLeft" file="Interface\Spellbook\UI-SpellbookPanel-TopLeft">
+                    <Size>
+                        <AbsDimension x="256" y="256"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT"/>
+                    </Anchors>
+                </Texture>
+                <Texture name="$parentTopRight" file="Interface\Spellbook\UI-SpellbookPanel-TopRight">
+                    <Size>
+                        <AbsDimension x="128" y="256"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="TOPRIGHT"/>
+                    </Anchors>
+                </Texture>
+                <Texture name="$parentBotLeft" file="Interface\Spellbook\UI-SpellbookPanel-BotLeft">
+                    <Size>
+                        <AbsDimension x="256" y="256"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="BOTTOMLEFT"/>
+                    </Anchors>
+                </Texture>
+                <Texture name="$parentBotRight" file="Interface\Spellbook\UI-SpellbookPanel-BotRight">
+                    <Size>
+                        <AbsDimension x="128" y="256"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="BOTTOMRIGHT"/>
+                    </Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="$parentTitle" inherits="GameFontNormal" text="Companions &amp; Commands">
+                    <Anchors>
+                        <Anchor point="TOP" x="0" y="-22"/>
+                    </Anchors>
+                </FontString>
+                <FontString name="$parentPageText" inherits="GameFontHighlightSmall" text="Page 1/1">
+                    <Anchors>
+                        <Anchor point="BOTTOM" x="0" y="18"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <Button name="$parentClose" inherits="UIPanelCloseButton">
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-28" y="-9"/>
+                </Anchors>
+            </Button>
+            <Button name="$parentPrevPage">
+                <Size>
+                    <AbsDimension x="24" y="22"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" x="200" y="10"/>
+                </Anchors>
+            </Button>
+            <Button name="$parentNextPage">
+                <Size>
+                    <AbsDimension x="24" y="22"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="BOTTOMRIGHT" x="-200" y="10"/>
+                </Anchors>
+            </Button>
+            <Frame name="$parentTabContainer">
+                <Size>
+                    <AbsDimension x="32" y="374"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-28" y="-73"/>
+                </Anchors>
+            </Frame>
+            <Frame name="$parentGridContainer">
+                <Size>
+                    <AbsDimension x="330" y="310"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT" x="16" y="-69"/>
+                </Anchors>
+            </Frame>
+            <Frame name="$parentCompanionContainer" hidden="true">
+                <Size>
+                    <AbsDimension x="330" y="310"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT" x="24" y="-132"/>
+                </Anchors>
+            </Frame>
+        </Frames>
+        <Scripts>
+            <OnLoad>
+                Forged_Mangosbot_BookOfCommands_FrameLoaded = true
+            </OnLoad>
+        </Scripts>
+    </Frame>
+</Ui>

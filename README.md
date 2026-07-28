@@ -1,6 +1,6 @@
 # Forged_Mangosbot
 
-Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depends on Mangosbot and provides a Spellbook-style companion command book while extending Mangosbot's bot selection UX.
+Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depends on Mangosbot and provides a Spellbook-style Book of Commands while extending Mangosbot's bot selection UX.
 
 ## Dependency
 
@@ -13,11 +13,12 @@ Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depend
 1. Install Mangosbot into Interface/AddOns/Mangosbot.
 2. Install this addon into Interface/AddOns/Forged_Mangosbot.
 3. Enable both addons in the character selection addon list.
-4. Log in and run /forgedbot to open the companion command book.
+4. Log in and run /forgedbot to open the Book of Commands.
 
 ## What This Addon Does
 
 - Loads after Mangosbot and uses Mangosbot globals without modifying Mangosbot source.
+- Uses a single XML-defined main window path (no Lua fallback window construction).
 - Hides Mangosbot roster/control frames while preserving Mangosbot logic.
 - Builds command definitions from Mangosbot factory functions plus inline actions/inventory sets.
 - Displays commands in a tabbed, paged icon book.
@@ -29,7 +30,7 @@ Forged_Mangosbot is a World of Warcraft 1.12 addon (Interface 11200) that depend
 - Clicking a bot character no longer auto-opens Mangosbot's Selected Bot command window.
 - Right-clicking the selected character portrait now includes a `Command` menu entry when the unit is recognized as a bot.
 - Selecting `Command` opens Mangosbot's legacy Selected Bot command window on demand.
-- The Forged command book is still available via `/forgedbot`, `/fmb`, and keybinds.
+- The Forged Book of Commands is still available via `/forgedbot`, `/fmb`, and keybinds.
 
 ## Macro Slot Constraint (WoW 1.12)
 
@@ -50,7 +51,7 @@ The Companions tab reads the hidden Mangosbot BotRoster item widgets (name and c
 If upstream Mangosbot adds, removes, or renames toolbar factory functions:
 
 1. Update Registry.lua factory harvest list.
-2. Add or remove a category in UI/CommandBook.lua.
+2. Add or remove a category in UI/BookOfCommands.lua.
 3. Verify id stability format ([category].[key]) for macro reuse.
 4. Keep actions/inventory inline tables synced with Mangosbot if those definitions change upstream.
 
