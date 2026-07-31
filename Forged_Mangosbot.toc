@@ -8,10 +8,11 @@
 ## Website: https://forgedworlds.com
 ## Email: chromag@forgedworlds.com
 
-Forged_Mangosbot.lua
+core.lua
+MainWindow.lua
 BookOfCommands.lua
 BookOfCommands.xml
 Registry.lua
 MacroBridge.lua
-UI/CompanionPanel.lua
+CompanionList.lua
 Bindings.xml

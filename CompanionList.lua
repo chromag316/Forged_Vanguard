@@ -1,22 +1,21 @@
 Forged_Mangosbot = Forged_Mangosbot or {}
 
-local CompanionPanel = {}
-
-Forged_Mangosbot.CompanionPanel = CompanionPanel
+local CompanionList = {}
+Forged_Mangosbot.CompanionList = CompanionList
 
 local panelFrame = nil
 local rows = {}
 local emptyText = nil
 local elapsedSinceRefresh = 0
 
-local function CompanionPanel_SetSelection(name)
+local function CompanionList_SetSelection(name)
     CurrentBot = name
     if type(QuerySelectedBot) == "function" then
         QuerySelectedBot(name)
     end
 end
 
-local function CompanionPanel_CreateRow(parent, index)
+local function CompanionList_CreateRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
     row:SetWidth(468)
     row:SetHeight(24)
@@ -46,15 +45,15 @@ local function CompanionPanel_CreateRow(parent, index)
 
     row:SetScript("OnClick", function()
         if this.companionName and this.companionName ~= "" then
-            CompanionPanel_SetSelection(this.companionName)
-            CompanionPanel.Refresh()
+            CompanionList_SetSelection(this.companionName)
+            CompanionList.Refresh()
         end
     end)
 
     return row
 end
 
-local function CompanionPanel_UpdateRowVisual(row)
+local function CompanionList_UpdateRowVisual(row)
     if row.companionName and CurrentBot and row.companionName == CurrentBot then
         row:SetBackdropBorderColor(0.1, 0.8, 0.3, 1.0)
     else
@@ -62,7 +61,7 @@ local function CompanionPanel_UpdateRowVisual(row)
     end
 end
 
-local function CompanionPanel_UpdateFromRoster()
+local function CompanionList_UpdateFromRoster()
     local count = 0
     local i
 
@@ -95,7 +94,7 @@ local function CompanionPanel_UpdateFromRoster()
                             row.icon:SetTexture("Interface\\Addons\\Mangosbot\\Images\\role_dps.tga")
                         end
                     end
-                    CompanionPanel_UpdateRowVisual(row)
+                    CompanionList_UpdateRowVisual(row)
                     row:Show()
                 end
             end
@@ -116,11 +115,11 @@ local function CompanionPanel_UpdateFromRoster()
     end
 end
 
-function CompanionPanel.Refresh()
-    CompanionPanel_UpdateFromRoster()
+function CompanionList.Refresh()
+    CompanionList_UpdateFromRoster()
 end
 
-function CompanionPanel.Init(parent)
+function CompanionList.Init(parent)
     if panelFrame then
         return panelFrame
     end
@@ -140,7 +139,7 @@ function CompanionPanel.Init(parent)
 
     local i
     for i = 1, 10 do
-        rows[i] = CompanionPanel_CreateRow(panelFrame, i)
+        rows[i] = CompanionList_CreateRow(panelFrame, i)
         rows[i]:Hide()
     end
 
@@ -152,10 +151,12 @@ function CompanionPanel.Init(parent)
         elapsedSinceRefresh = elapsedSinceRefresh + arg1
         if elapsedSinceRefresh >= 1 then
             elapsedSinceRefresh = 0
-            CompanionPanel_UpdateFromRoster()
+            CompanionList_UpdateFromRoster()
         end
     end)
 
-    CompanionPanel_UpdateFromRoster()
+    CompanionList_UpdateFromRoster()
     return panelFrame
 end
+
+Forged_Mangosbot.CompanionPanel = CompanionList
