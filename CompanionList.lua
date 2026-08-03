@@ -4,11 +4,27 @@ local CompanionList = {}
 Forged_Mangosbot.CompanionList = CompanionList
 
 local panelFrame = nil
+local listInset = nil
 local rows = {}
 local emptyText = nil
 local elapsedSinceRefresh = 0
 local maxVisibleRows = 10
 local rosterRefreshRequested = false
+local socialTabInstalled = false
+local socialSubFrameName = "Forged_Mangosbot_CompanionSocialFrame"
+local socialSubFrame = nil
+local socialContentFrame = nil
+local socialTabId = 0
+local socialShowSubFrameHooked = false
+
+local socialBaseSubFrames = {
+    "FriendsFrameFriendsScrollFrame",
+    "FriendsFrameWhoFrame",
+    "FriendsFrameIgnoreFrame",
+    "FriendsFrameGuildFrame",
+    "FriendsFrameGuildStatusFrame",
+    "FriendsFrameRaidFrame"
+}
 
 local function CompanionList_RequestRosterRefresh()
     if type(SendBotCommand) == "function" then
@@ -121,24 +137,40 @@ end
 
 local function CompanionList_CreateRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(36)
-    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 16, -16 - (index - 1) * 36)
-    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -16, -16 - (index - 1) * 36)
+    row:SetHeight(34)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 6, -8 - (index - 1) * 34)
+    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -6, -8 - (index - 1) * 34)
+
+    row.selected = row:CreateTexture(nil, "BACKGROUND")
+    row.selected:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar")
+    row.selected:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+    row.selected:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+    row.selected:SetVertexColor(1, 0.82, 0, 0.35)
+    row.selected:Hide()
+
+    row:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar", "ADD")
+    row.highlight = row:GetHighlightTexture()
+    if row.highlight then
+        row.highlight:SetVertexColor(1, 1, 1, 0.2)
+        row.highlight:ClearAllPoints()
+        row.highlight:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        row.highlight:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+    end
 
     row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetWidth(18)
-    row.icon:SetHeight(18)
-    row.icon:SetPoint("LEFT", row, "LEFT", 8, 0)
+    row.icon:SetWidth(16)
+    row.icon:SetHeight(16)
+    row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 8, -8)
     row.icon:SetTexture("Interface\\Addons\\Mangosbot\\Images\\role_dps.tga")
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, -1)
+    row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 2)
     row.text:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetText("-")
 
     row.subText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.subText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -2)
+    row.subText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -1)
     row.subText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     row.subText:SetJustifyH("LEFT")
     row.subText:SetText("")
@@ -155,11 +187,17 @@ end
 
 local function CompanionList_UpdateRowVisual(row)
     if row.companionName and CurrentBot and row.companionName == CurrentBot then
+        row.selected:Show()
+        row.text:SetTextColor(0.95, 0.95, 0.95, 1)
+        row.subText:SetTextColor(0.95, 0.95, 0.95, 1)
+    elseif row.isOnline then
+        row.selected:Hide()
         row.text:SetTextColor(1, 0.82, 0, 1)
-        row.subText:SetTextColor(1, 1, 1, 1)
+        row.subText:SetTextColor(0.9, 0.9, 0.9, 1)
     else
-        row.text:SetTextColor(0.82, 0.82, 0.82, 1)
-        row.subText:SetTextColor(1, 1, 1, 1)
+        row.selected:Hide()
+        row.text:SetTextColor(0.72, 0.72, 0.72, 1)
+        row.subText:SetTextColor(0.88, 0.88, 0.88, 1)
     end
 end
 
@@ -184,6 +222,7 @@ local function CompanionList_UpdateFromRoster()
         local row = rows[i]
         if row and entry then
             row.companionName = entry.name
+            row.isOnline = entry.online == true
             row.text:SetText(entry.name .. " - " .. CompanionList_GetStatusText(entry))
             row.subText:SetText(CompanionList_GetDetailText(entry))
             row.icon:SetTexture(CompanionList_GetClassIcon(entry.class))
@@ -217,21 +256,38 @@ end
 
 function CompanionList.Init(parent)
     if panelFrame then
+        if parent then
+            panelFrame:SetParent(parent)
+            panelFrame:ClearAllPoints()
+            panelFrame:SetAllPoints(parent)
+        end
         return panelFrame
     end
 
     panelFrame = CreateFrame("Frame", "Forged_Mangosbot_CompanionPanel", parent)
     panelFrame:SetAllPoints(parent)
 
-    emptyText = panelFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    emptyText:SetPoint("TOPLEFT", panelFrame, "TOPLEFT", 16, -16)
-    emptyText:SetPoint("RIGHT", panelFrame, "RIGHT", -16, 0)
+    listInset = CreateFrame("Frame", nil, panelFrame)
+    listInset:SetPoint("TOPLEFT", panelFrame, "TOPLEFT", -3, 3)
+    listInset:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, -1)
+    listInset:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    listInset:SetBackdropColor(0, 0, 0, 1)
+    listInset:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+    emptyText = listInset:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    emptyText:SetPoint("TOPLEFT", listInset, "TOPLEFT", 12, -12)
+    emptyText:SetPoint("RIGHT", listInset, "RIGHT", -12, 0)
     emptyText:SetJustifyH("LEFT")
     emptyText:SetText("No companions detected yet.")
 
     local i
     for i = 1, maxVisibleRows do
-        rows[i] = CompanionList_CreateRow(panelFrame, i)
+        rows[i] = CompanionList_CreateRow(listInset, i)
         rows[i]:Hide()
     end
 
@@ -253,5 +309,157 @@ function CompanionList.Init(parent)
     CompanionList_UpdateFromRoster()
     return panelFrame
 end
+
+local function CompanionList_ShowSocialSubFrame()
+    local friendsFrame = getglobal("FriendsFrame")
+    if not friendsFrame then
+        return
+    end
+
+    if type(FriendsFrame_ShowSubFrame) == "function" and type(FRIENDSFRAME_SUBFRAMES) == "table" then
+        FriendsFrame_ShowSubFrame(socialSubFrameName)
+    else
+        local i
+        for i = 1, table.getn(socialBaseSubFrames) do
+            local subFrame = getglobal(socialBaseSubFrames[i])
+            if subFrame then
+                subFrame:Hide()
+            end
+        end
+        if socialSubFrame then
+            socialSubFrame:Show()
+        end
+    end
+
+    local titleText = getglobal("FriendsFrameTitleText")
+    if titleText and titleText.SetText then
+        titleText:SetText("Companion List")
+    end
+
+    if socialTabId > 0 and type(PanelTemplates_SetTab) == "function" then
+        friendsFrame.selectedTab = socialTabId
+        PanelTemplates_SetTab(friendsFrame, socialTabId)
+    end
+end
+
+local function CompanionList_BuildSocialPanel()
+    local friendsFrame = getglobal("FriendsFrame")
+    if not friendsFrame or socialSubFrame then
+        return
+    end
+
+    socialSubFrame = CreateFrame("Frame", socialSubFrameName, friendsFrame)
+    socialSubFrame:SetAllPoints(friendsFrame)
+    socialSubFrame:Hide()
+
+    socialContentFrame = CreateFrame("Frame", nil, socialSubFrame)
+    socialContentFrame:SetPoint("TOPLEFT", socialSubFrame, "TOPLEFT", 18, -74)
+    socialContentFrame:SetPoint("BOTTOMRIGHT", socialSubFrame, "BOTTOMRIGHT", -36, 80)
+
+    socialSubFrame:SetScript("OnShow", function()
+        CompanionList.Init(socialContentFrame)
+        CompanionList.Refresh()
+    end)
+end
+
+function CompanionList.SetupSocialTab()
+    if socialTabInstalled then
+        return true
+    end
+
+    local friendsFrame = getglobal("FriendsFrame")
+    if not friendsFrame then
+        return false
+    end
+
+    CompanionList_BuildSocialPanel()
+
+    local existingTabs = 0
+    while getglobal("FriendsFrameTab" .. (existingTabs + 1)) do
+        existingTabs = existingTabs + 1
+    end
+
+    socialTabId = existingTabs + 1
+    local tabName = "FriendsFrameTab" .. socialTabId
+    local tab = CreateFrame("Button", tabName, friendsFrame, "FriendsFrameTabTemplate")
+    local previousTab = getglobal("FriendsFrameTab" .. existingTabs)
+
+    tab:SetID(socialTabId)
+    if previousTab then
+        tab:SetPoint("LEFT", previousTab, "RIGHT", -16, 0)
+    else
+        tab:SetPoint("TOPLEFT", friendsFrame, "BOTTOMLEFT", 12, 7)
+    end
+
+    local tabText = getglobal(tabName .. "Text")
+    if tabText and tabText.SetText then
+        tabText:SetText("Companions")
+    elseif tab.SetText then
+        tab:SetText("Companions")
+    end
+
+    if type(PanelTemplates_TabResize) == "function" then
+        PanelTemplates_TabResize(0, tab)
+    end
+
+    tab:SetScript("OnClick", function()
+        CompanionList_ShowSocialSubFrame()
+    end)
+
+    if type(PanelTemplates_SetNumTabs) == "function" then
+        PanelTemplates_SetNumTabs(friendsFrame, socialTabId)
+    end
+
+    if type(FriendsFrame_ShowSubFrame) == "function" and not socialShowSubFrameHooked then
+        local originalShowSubFrame = FriendsFrame_ShowSubFrame
+        FriendsFrame_ShowSubFrame = function(frameName)
+            originalShowSubFrame(frameName)
+
+            if frameName == socialSubFrameName then
+                if socialSubFrame then
+                    socialSubFrame:Show()
+                end
+
+                local titleText = getglobal("FriendsFrameTitleText")
+                if titleText and titleText.SetText then
+                    titleText:SetText("Companion List")
+                end
+
+                local ff = getglobal("FriendsFrame")
+                if ff and socialTabId > 0 and type(PanelTemplates_SetTab) == "function" then
+                    ff.selectedTab = socialTabId
+                    PanelTemplates_SetTab(ff, socialTabId)
+                end
+            elseif socialSubFrame then
+                socialSubFrame:Hide()
+            end
+        end
+
+        socialShowSubFrameHooked = true
+    end
+
+    if type(FRIENDSFRAME_SUBFRAMES) == "table" then
+        local found = false
+        local i
+        for i = 1, table.getn(FRIENDSFRAME_SUBFRAMES) do
+            if FRIENDSFRAME_SUBFRAMES[i] == socialSubFrameName then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.insert(FRIENDSFRAME_SUBFRAMES, socialSubFrameName)
+        end
+    end
+
+    socialTabInstalled = true
+    return true
+end
+
+local socialEventFrame = CreateFrame("Frame")
+socialEventFrame:RegisterEvent("PLAYER_LOGIN")
+socialEventFrame:SetScript("OnEvent", function()
+    CompanionList.SetupSocialTab()
+end)
 
 Forged_Mangosbot.CompanionPanel = CompanionList

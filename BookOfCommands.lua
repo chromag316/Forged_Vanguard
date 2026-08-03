@@ -15,31 +15,11 @@ end
 local frame = nil
 local frameName = MainWindow.GetFrameName and MainWindow.GetFrameName() or "Forged_Mangosbot_BookOfCommandsFrame"
 local tabButtons = {}
-local mainTabs = {}
 local gridButtons = {}
 local BookOfCommands_Refresh
-local currentMainTab = "companions"
 local currentCategory = "movement"
 local currentPage = 1
 local perPage = 12
-
-local mainTabOrder = {
-    "companions",
-    "commands"
-}
-
-local mainTabDefinitions = {
-    companions = {
-        id = 1,
-        buttonText = "Companions",
-        titleText = "Companion List"
-    },
-    commands = {
-        id = 2,
-        buttonText = "Commands",
-        titleText = "Book of Commands"
-    }
-}
 
 local categories = {
     { key = "movement", label = "Movement", icon = "Ability_Rogue_Sprint" },
@@ -51,18 +31,6 @@ local categories = {
     { key = "actions", label = "Actions", icon = "INV_Misc_Gear_01" },
     { key = "inventory", label = "Inventory", icon = "INV_Box_02" }
 }
-
-local function BookOfCommands_GetMainTabDefinition(tabKey)
-    return mainTabDefinitions[tabKey] or mainTabDefinitions.commands
-end
-
-local function BookOfCommands_GetCurrentMainTabDefinition()
-    return BookOfCommands_GetMainTabDefinition(currentMainTab)
-end
-
-local function BookOfCommands_IsCompanionTabActive()
-    return currentMainTab == "companions"
-end
 
 local function BookOfCommands_IsCategorySelected(categoryKey)
     return currentCategory == categoryKey
@@ -171,10 +139,8 @@ local function BookOfCommands_UpdatePageText(total)
         currentPage = maxPage
     end
 
-    local pageControlsVisible = not BookOfCommands_IsCompanionTabActive()
-
     if MainWindow.SetPageControlsVisible then
-        MainWindow.SetPageControlsVisible(pageControlsVisible)
+        MainWindow.SetPageControlsVisible(true)
     end
 
     local pageTextValue = "Page " .. currentPage .. "/" .. maxPage
@@ -184,16 +150,8 @@ local function BookOfCommands_UpdatePageText(total)
         getglobal("Forged_Mangosbot_BookOfCommandsFramePageText"):SetText(pageTextValue)
     end
 
-    local prevEnabled = false
-    local nextEnabled = false
-
-    if not pageControlsVisible then
-        prevEnabled = false
-        nextEnabled = false
-    else
-        prevEnabled = currentPage > 1
-        nextEnabled = currentPage < maxPage
-    end
+    local prevEnabled = currentPage > 1
+    local nextEnabled = currentPage < maxPage
 
     if MainWindow.SetPageButtonsEnabled then
         MainWindow.SetPageButtonsEnabled(prevEnabled, nextEnabled)
@@ -219,34 +177,8 @@ local function BookOfCommands_UpdatePageText(total)
     end
 end
 
-local function BookOfCommands_UpdateMainTabs()
-    local i
-    local currentTab = BookOfCommands_GetCurrentMainTabDefinition()
-
-    for i = 1, table.getn(mainTabs) do
-        local tab = mainTabs[i]
-        local selected = tab.tabKey == currentMainTab
-
-        if selected then
-            tab:LockHighlight()
-            if tab.SetButtonState then
-                tab:SetButtonState("PUSHED", true)
-            end
-        else
-            tab:UnlockHighlight()
-            if tab.SetButtonState then
-                tab:SetButtonState("NORMAL")
-            end
-        end
-    end
-
-    if frame and type(PanelTemplates_SetTab) == "function" then
-        PanelTemplates_SetTab(frame, currentTab.id)
-    end
-end
-
 local function BookOfCommands_UpdateWindowTitle()
-    local titleTextValue = BookOfCommands_GetCurrentMainTabDefinition().titleText
+    local titleTextValue = "Book of Commands"
     if MainWindow.SetTitle then
         MainWindow.SetTitle(titleTextValue)
         return
@@ -325,30 +257,6 @@ local function BookOfCommands_UpdateGrid()
     BookOfCommands_UpdatePageText(total)
 end
 
-local function BookOfCommands_ShowCompanionPanel()
-    local companionList = Forged_Mangosbot.CompanionList or {}
-    local companionContainer = MainWindow.GetCompanionContainer and MainWindow.GetCompanionContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameCompanionContainer")
-    local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameGridContainer")
-    local tabContainer = MainWindow.GetTabContainer and MainWindow.GetTabContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameTabContainer")
-
-    if gridContainer then
-        gridContainer:Hide()
-    end
-    if tabContainer then
-        tabContainer:Hide()
-    end
-    if companionContainer then
-        companionContainer:Show()
-    end
-
-    if companionList and companionList.Init then
-        companionList.Init(companionContainer)
-        companionList.Refresh()
-    end
-
-    BookOfCommands_UpdatePageText(0)
-end
-
 local function BookOfCommands_ShowGridPanel()
     local companionContainer = MainWindow.GetCompanionContainer and MainWindow.GetCompanionContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameCompanionContainer")
     local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameGridContainer")
@@ -368,48 +276,8 @@ end
 
 BookOfCommands_Refresh = function()
     BookOfCommands_UpdateWindowTitle()
-    BookOfCommands_UpdateMainTabs()
     BookOfCommands_UpdateTabs()
-    if BookOfCommands_IsCompanionTabActive() then
-        BookOfCommands_ShowCompanionPanel()
-    else
-        BookOfCommands_ShowGridPanel()
-    end
-end
-
-local function BookOfCommands_SetMainTab(tabKey)
-    currentMainTab = tabKey
-    currentPage = 1
-    BookOfCommands_Refresh()
-end
-
-local function BookOfCommands_CreateMainTab(parent, tabKey)
-    local definition = BookOfCommands_GetMainTabDefinition(tabKey)
-    local id = definition.id
-    local name = parent:GetName() .. "Tab" .. id
-    local tab = CreateFrame("Button", name, parent, "CharacterFrameTabButtonTemplate")
-    tab:SetID(id)
-    tab:SetText(definition.buttonText)
-    tab.tabKey = tabKey
-
-    if id == 1 then
-        tab:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 10, 46)
-    else
-        tab:SetPoint("LEFT", mainTabs[id - 1], "RIGHT", -14, 0)
-    end
-
-    if type(PanelTemplates_TabResize) == "function" then
-        PanelTemplates_TabResize(0, tab)
-    else
-        tab:SetWidth(96)
-        tab:SetHeight(24)
-    end
-
-    tab:SetScript("OnClick", function()
-        BookOfCommands_SetMainTab(this.tabKey)
-    end)
-
-    return tab
+    BookOfCommands_ShowGridPanel()
 end
 
 local function BookOfCommands_CreateTab(parent, category, index)
@@ -685,18 +553,6 @@ function BookOfCommands.Init()
         companionContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -69)
         companionContainer:SetWidth(330)
         companionContainer:SetHeight(310)
-    end
-
-    local mainTabIndex
-    for mainTabIndex = 1, table.getn(mainTabOrder) do
-        mainTabs[mainTabIndex] = BookOfCommands_CreateMainTab(frame, mainTabOrder[mainTabIndex])
-    end
-
-    if type(PanelTemplates_SetNumTabs) == "function" then
-        PanelTemplates_SetNumTabs(frame, table.getn(mainTabOrder))
-    end
-    if type(PanelTemplates_SetTab) == "function" then
-        PanelTemplates_SetTab(frame, BookOfCommands_GetCurrentMainTabDefinition().id)
     end
 
     local i
