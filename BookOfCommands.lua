@@ -17,6 +17,7 @@ local frameName = MainWindow.GetFrameName and MainWindow.GetFrameName() or "Forg
 local tabButtons = {}
 local mainTabs = {}
 local gridButtons = {}
+local BookOfCommands_Refresh
 local currentMainTab = "companions"
 local currentCategory = "movement"
 local currentPage = 1
@@ -365,7 +366,7 @@ local function BookOfCommands_ShowGridPanel()
     BookOfCommands_UpdateGrid()
 end
 
-local function BookOfCommands_Refresh()
+BookOfCommands_Refresh = function()
     BookOfCommands_UpdateWindowTitle()
     BookOfCommands_UpdateMainTabs()
     BookOfCommands_UpdateTabs()
