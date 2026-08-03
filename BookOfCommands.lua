@@ -5,7 +5,6 @@ Forged_Mangosbot.BookOfCommands = BookOfCommands
 Forged_Mangosbot_BookOfCommands_Loaded = true
 
 local MainWindow = Forged_Mangosbot.MainWindow or {}
-local CompanionList = Forged_Mangosbot.CompanionList or {}
 
 local function BookOfCommands_Print(message)
     if DEFAULT_CHAT_FRAME and message then
@@ -171,6 +170,12 @@ local function BookOfCommands_UpdatePageText(total)
         currentPage = maxPage
     end
 
+    local pageControlsVisible = not BookOfCommands_IsCompanionTabActive()
+
+    if MainWindow.SetPageControlsVisible then
+        MainWindow.SetPageControlsVisible(pageControlsVisible)
+    end
+
     local pageTextValue = "Page " .. currentPage .. "/" .. maxPage
     if MainWindow.SetPageText then
         MainWindow.SetPageText(pageTextValue)
@@ -181,7 +186,7 @@ local function BookOfCommands_UpdatePageText(total)
     local prevEnabled = false
     local nextEnabled = false
 
-    if BookOfCommands_IsCompanionTabActive() then
+    if not pageControlsVisible then
         prevEnabled = false
         nextEnabled = false
     else
@@ -320,6 +325,7 @@ local function BookOfCommands_UpdateGrid()
 end
 
 local function BookOfCommands_ShowCompanionPanel()
+    local companionList = Forged_Mangosbot.CompanionList or {}
     local companionContainer = MainWindow.GetCompanionContainer and MainWindow.GetCompanionContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameCompanionContainer")
     local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameGridContainer")
     local tabContainer = MainWindow.GetTabContainer and MainWindow.GetTabContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameTabContainer")
@@ -334,9 +340,9 @@ local function BookOfCommands_ShowCompanionPanel()
         companionContainer:Show()
     end
 
-    if CompanionList and CompanionList.Init then
-        CompanionList.Init(companionContainer)
-        CompanionList.Refresh()
+    if companionList and companionList.Init then
+        companionList.Init(companionContainer)
+        companionList.Refresh()
     end
 
     BookOfCommands_UpdatePageText(0)

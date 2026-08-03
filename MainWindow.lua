@@ -69,6 +69,32 @@ function MainWindow.SetPageButtonsEnabled(prevEnabled, nextEnabled)
     end
 end
 
+function MainWindow.SetPageControlsVisible(visible)
+    if pageText then
+        if visible then
+            pageText:Show()
+        else
+            pageText:Hide()
+        end
+    end
+
+    if prevButton then
+        if visible then
+            prevButton:Show()
+        else
+            prevButton:Hide()
+        end
+    end
+
+    if nextButton then
+        if visible then
+            nextButton:Show()
+        else
+            nextButton:Hide()
+        end
+    end
+end
+
 function MainWindow.Show()
     if not frame then
         MainWindow.Init()
