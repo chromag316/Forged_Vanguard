@@ -18,13 +18,29 @@ local socialTabId = 0
 local socialShowSubFrameHooked = false
 
 local socialBaseSubFrames = {
-    "FriendsFrameFriendsScrollFrame",
-    "FriendsFrameWhoFrame",
-    "FriendsFrameIgnoreFrame",
-    "FriendsFrameGuildFrame",
-    "FriendsFrameGuildStatusFrame",
-    "FriendsFrameRaidFrame"
+    "FriendsListFrame",
+    "IgnoreListFrame",
+    "WhoFrame",
+    "GuildFrame",
+    "RaidFrame"
 }
+
+local function CompanionList_SetRaidBackground()
+    local raidBackgrounds = {
+        { "FriendsFrameTopLeft", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopLeft" },
+        { "FriendsFrameTopRight", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopRight" },
+        { "FriendsFrameBottomLeft", "Interface\\PaperDollInfoFrame\\UI-Character-General-BottomLeft" },
+        { "FriendsFrameBottomRight", "Interface\\PaperDollInfoFrame\\UI-Character-General-BottomRight" }
+    }
+    local i
+
+    for i = 1, table.getn(raidBackgrounds) do
+        local texture = getglobal(raidBackgrounds[i][1])
+        if texture and texture.SetTexture then
+            texture:SetTexture(raidBackgrounds[i][2])
+        end
+    end
+end
 
 local function CompanionList_RequestRosterRefresh()
     if type(SendBotCommand) == "function" then
@@ -137,41 +153,34 @@ end
 
 local function CompanionList_CreateRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(34)
-    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 6, -8 - (index - 1) * 34)
-    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -6, -8 - (index - 1) * 34)
+    row:SetWidth(298)
+    row:SetHeight(31)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 5, -2 - (index - 1) * 31)
 
-    row.selected = row:CreateTexture(nil, "BACKGROUND")
-    row.selected:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar")
-    row.selected:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-    row.selected:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
-    row.selected:SetVertexColor(1, 0.82, 0, 0.35)
-    row.selected:Hide()
-
-    row:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar", "ADD")
+    row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     row.highlight = row:GetHighlightTexture()
     if row.highlight then
-        row.highlight:SetVertexColor(1, 1, 1, 0.2)
         row.highlight:ClearAllPoints()
         row.highlight:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
         row.highlight:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
     end
+    row:UnlockHighlight()
 
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetWidth(16)
     row.icon:SetHeight(16)
-    row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 8, -8)
+    row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -4)
     row.icon:SetTexture("Interface\\Addons\\Mangosbot\\Images\\role_dps.tga")
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 2)
-    row.text:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 4, 1)
+    row.text:SetPoint("RIGHT", row, "RIGHT", -10, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetText("-")
 
     row.subText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.subText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -1)
-    row.subText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    row.subText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, 0)
+    row.subText:SetPoint("RIGHT", row, "RIGHT", -10, 0)
     row.subText:SetJustifyH("LEFT")
     row.subText:SetText("")
 
@@ -187,17 +196,18 @@ end
 
 local function CompanionList_UpdateRowVisual(row)
     if row.companionName and CurrentBot and row.companionName == CurrentBot then
-        row.selected:Show()
-        row.text:SetTextColor(0.95, 0.95, 0.95, 1)
-        row.subText:SetTextColor(0.95, 0.95, 0.95, 1)
-    elseif row.isOnline then
-        row.selected:Hide()
-        row.text:SetTextColor(1, 0.82, 0, 1)
-        row.subText:SetTextColor(0.9, 0.9, 0.9, 1)
+        row:LockHighlight()
+        row.text:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+        row.subText:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
     else
-        row.selected:Hide()
-        row.text:SetTextColor(0.72, 0.72, 0.72, 1)
-        row.subText:SetTextColor(0.88, 0.88, 0.88, 1)
+        row:UnlockHighlight()
+        if row.isOnline then
+            row.text:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+            row.subText:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+        else
+            row.text:SetTextColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b)
+            row.subText:SetTextColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b)
+        end
     end
 end
 
@@ -268,20 +278,20 @@ function CompanionList.Init(parent)
     panelFrame:SetAllPoints(parent)
 
     listInset = CreateFrame("Frame", nil, panelFrame)
-    listInset:SetPoint("TOPLEFT", panelFrame, "TOPLEFT", -3, 3)
-    listInset:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, -1)
-    listInset:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
-    listInset:SetBackdropColor(0, 0, 0, 1)
-    listInset:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    listInset:SetPoint("TOPLEFT", panelFrame, "TOPLEFT", 0, 0)
+    listInset:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", 0, 0)
+    -- listInset:SetBackdrop({
+    --     bgFile = "Interface\\Buttons\\WHITE8X8",
+    --     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    --     edgeSize = 16,
+    --     insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    -- })
+    -- listInset:SetBackdropColor(0, 0, 0, 1)
+    -- listInset:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
     emptyText = listInset:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    emptyText:SetPoint("TOPLEFT", listInset, "TOPLEFT", 12, -12)
-    emptyText:SetPoint("RIGHT", listInset, "RIGHT", -12, 0)
+    emptyText:SetPoint("TOPLEFT", listInset, "TOPLEFT", 15, -5)
+    emptyText:SetPoint("RIGHT", listInset, "RIGHT", -10, 0)
     emptyText:SetJustifyH("LEFT")
     emptyText:SetText("No companions detected yet.")
 
@@ -330,6 +340,8 @@ local function CompanionList_ShowSocialSubFrame()
             socialSubFrame:Show()
         end
     end
+
+    CompanionList_SetRaidBackground()
 
     local titleText = getglobal("FriendsFrameTitleText")
     if titleText and titleText.SetText then
@@ -435,9 +447,15 @@ function CompanionList.SetupSocialTab()
     if type(FriendsFrame_ShowSubFrame) == "function" and not socialShowSubFrameHooked then
         local originalShowSubFrame = FriendsFrame_ShowSubFrame
         FriendsFrame_ShowSubFrame = function(frameName)
-            originalShowSubFrame(frameName)
-
             if frameName == socialSubFrameName then
+                local i
+                for i = 1, table.getn(socialBaseSubFrames) do
+                    local subFrame = getglobal(socialBaseSubFrames[i])
+                    if subFrame then
+                        subFrame:Hide()
+                    end
+                end
+
                 if socialSubFrame then
                     socialSubFrame:Show()
                 end
@@ -452,8 +470,12 @@ function CompanionList.SetupSocialTab()
                     ff.selectedTab = socialTabId
                     PanelTemplates_SetTab(ff, socialTabId)
                 end
-            elseif socialSubFrame then
-                socialSubFrame:Hide()
+            else
+                originalShowSubFrame(frameName)
+
+                if socialSubFrame then
+                    socialSubFrame:Hide()
+                end
             end
         end
 
