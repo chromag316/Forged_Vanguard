@@ -382,13 +382,35 @@ function CompanionList.SetupSocialTab()
     socialTabId = existingTabs + 1
     local tabName = "FriendsFrameTab" .. socialTabId
     local tab = CreateFrame("Button", tabName, friendsFrame, "FriendsFrameTabTemplate")
-    local previousTab = getglobal("FriendsFrameTab" .. existingTabs)
 
     tab:SetID(socialTabId)
-    if previousTab then
-        tab:SetPoint("LEFT", previousTab, "RIGHT", -16, 0)
+    local friendsTab = getglobal("FriendsFrameTab1")
+    if friendsTab then
+        tab:SetPoint("LEFT", friendsTab, "RIGHT", -16, 0)
+
+        local i
+        for i = 2, existingTabs do
+            local shiftedTab = getglobal("FriendsFrameTab" .. i)
+            local anchorTab = nil
+
+            if i == 2 then
+                anchorTab = tab
+            else
+                anchorTab = getglobal("FriendsFrameTab" .. (i - 1))
+            end
+
+            if shiftedTab and anchorTab then
+                shiftedTab:ClearAllPoints()
+                shiftedTab:SetPoint("LEFT", anchorTab, "RIGHT", -16, 0)
+            end
+        end
     else
-        tab:SetPoint("TOPLEFT", friendsFrame, "BOTTOMLEFT", 12, 7)
+        local previousTab = getglobal("FriendsFrameTab" .. existingTabs)
+        if previousTab then
+            tab:SetPoint("LEFT", previousTab, "RIGHT", -16, 0)
+        else
+            tab:SetPoint("TOPLEFT", friendsFrame, "BOTTOMLEFT", 12, 7)
+        end
     end
 
     local tabText = getglobal(tabName .. "Text")
