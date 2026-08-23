@@ -51,7 +51,7 @@ The Companions tab reads the hidden Mangosbot BotRoster item widgets (name and c
 If upstream Mangosbot adds, removes, or renames toolbar factory functions:
 
 1. Update Registry.lua factory harvest list.
-2. Add or remove a category in UI/BookOfCommands.lua.
+2. Add or remove a category in BookOfCommands.lua.
 3. Verify id stability format ([category].[key]) for macro reuse.
 4. Keep actions/inventory inline tables synced with Mangosbot if those definitions change upstream.
 

@@ -43,7 +43,7 @@ local function Forged_Mangosbot_ResolveBookOfCommandsHandlers()
     end
 
     if (not initFn or not toggleFn) and type(dofile) == "function" then
-        pcall(dofile, "Interface\\AddOns\\Forged_Mangosbot\\UI\\BookOfCommands.lua")
+        pcall(dofile, "Interface\\AddOns\\Forged_Mangosbot\\BookOfCommands.lua")
         if not initFn and type(Forged_Mangosbot_BookOfCommands_Init) == "function" then
             initFn = Forged_Mangosbot_BookOfCommands_Init
         end
