@@ -7,6 +7,10 @@ local panelFrame = nil
 local listInset = nil
 local rows = {}
 local emptyText = nil
+local companionLevelCache = {}
+local bulkActionButton = nil
+local bulkInviteButton = nil
+local bulkSummonButton = nil
 local elapsedSinceRefresh = 0
 local maxVisibleRows = 10
 local rosterRefreshRequested = false
@@ -16,6 +20,11 @@ local socialSubFrame = nil
 local socialContentFrame = nil
 local socialTabId = 0
 local socialShowSubFrameHooked = false
+local socialShouldRestoreOnShow = false
+local CompanionList_NormalizeClassAndLevel = nil
+local CompanionList_GetObservedCompanionLevel = nil
+local CompanionList_UpdateRowVisual = nil
+local CompanionList_UpdateAllRowVisuals = nil
 
 local socialBaseSubFrames = {
     "FriendsListFrame",
@@ -25,20 +34,305 @@ local socialBaseSubFrames = {
     "RaidFrame"
 }
 
-local function CompanionList_SetRaidBackground()
-    local raidBackgrounds = {
-        { "FriendsFrameTopLeft", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopLeft" },
-        { "FriendsFrameTopRight", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopRight" },
-        { "FriendsFrameBottomLeft", "Interface\\PaperDollInfoFrame\\UI-Character-General-BottomLeft" },
-        { "FriendsFrameBottomRight", "Interface\\PaperDollInfoFrame\\UI-Character-General-BottomRight" }
-    }
+local function CompanionList_BuildAllBotsList(entries)
+    local names = {}
     local i
 
-    for i = 1, table.getn(raidBackgrounds) do
-        local texture = getglobal(raidBackgrounds[i][1])
-        if texture and texture.SetTexture then
-            texture:SetTexture(raidBackgrounds[i][2])
+    for i = 1, table.getn(entries) do
+        if entries[i] and entries[i].name and entries[i].name ~= "" then
+            table.insert(names, entries[i].name)
         end
+    end
+
+    return table.concat(names, ",")
+end
+
+local function CompanionList_SplitNames(csv)
+    local names = {}
+    local name = nil
+    local iterator = string.gmatch or string.gfind
+
+    if not csv or csv == "" or type(iterator) ~= "function" then
+        return names
+    end
+
+    for name in iterator(csv, "([^,]+)") do
+        table.insert(names, name)
+    end
+
+    return names
+end
+
+local function CompanionList_HasOfflineEntries(entries)
+    local i
+
+    for i = 1, table.getn(entries) do
+        if entries[i] and entries[i].online ~= true then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function CompanionList_HasCompanionsOutsideParty(entries)
+    local i
+    local name
+
+    for i = 1, table.getn(entries) do
+        if entries[i] and entries[i].online == true and entries[i].name and entries[i].name ~= "" then
+            name = entries[i].name
+            if type(partyName) ~= "function" then
+                return true
+            end
+            if partyName(1) ~= name and partyName(2) ~= name and partyName(3) ~= name and partyName(4) ~= name and partyName(5) ~= name then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function CompanionList_HasCompanionsInParty(entries)
+    local i
+    local name
+
+    if type(partyName) ~= "function" then
+        return false
+    end
+
+    for i = 1, table.getn(entries) do
+        if entries[i] and entries[i].online == true and entries[i].name and entries[i].name ~= "" then
+            name = entries[i].name
+            if partyName(1) == name or partyName(2) == name or partyName(3) == name or partyName(4) == name or partyName(5) == name then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function CompanionList_HasCompanionsOnline(entries)
+    local i
+
+    for i = 1, table.getn(entries) do
+        if entries[i] and entries[i].online == true then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function CompanionList_GetStatusText(entry)
+    if not entry then
+        return "Offline"
+    end
+
+    if entry.online then
+        return "Online"
+    end
+
+    return "Offline"
+end
+
+local function CompanionList_GetNameText(entry)
+    if not entry or not entry.name then
+        return "-"
+    end
+
+    if entry.online then
+        return entry.name
+    end
+
+    return entry.name .. " - Offline"
+end
+
+local function CompanionList_UpdateBulkActionButton(entries)
+    if not bulkActionButton then
+        return
+    end
+
+    if table.getn(entries) == 0 then
+        bulkActionButton:SetText("Login All")
+        bulkActionButton.allBots = nil
+        bulkActionButton.action = nil
+        bulkActionButton:Disable()
+        bulkActionButton:Show()
+        return
+    end
+
+    bulkActionButton.allBots = CompanionList_BuildAllBotsList(entries)
+    if not bulkActionButton.allBots or bulkActionButton.allBots == "" then
+        bulkActionButton:SetText("Login All")
+        bulkActionButton.action = nil
+        bulkActionButton:Disable()
+        bulkActionButton:Show()
+        return
+    end
+
+    if CompanionList_HasCompanionsOnline(entries) then
+        bulkActionButton.action = "logout"
+        bulkActionButton:SetText("Logout All")
+    else
+        bulkActionButton.action = "login"
+        bulkActionButton:SetText("Login All")
+    end
+
+    bulkActionButton:Enable()
+    bulkActionButton:Show()
+end
+
+local function CompanionList_UpdateBulkGroupButtons(entries)
+    local hasOutsideParty = false
+    local hasInParty = false
+    local hasOnline = false
+
+    if not bulkInviteButton or not bulkSummonButton then
+        return
+    end
+
+    bulkInviteButton:SetText("Invite All")
+    bulkSummonButton:SetText("Summon All")
+
+    if table.getn(entries) == 0 then
+        bulkInviteButton.names = nil
+        bulkSummonButton.names = nil
+        bulkInviteButton:Disable()
+        bulkSummonButton:Disable()
+        bulkInviteButton:Show()
+        bulkSummonButton:Show()
+        return
+    end
+
+    bulkInviteButton.names = CompanionList_BuildAllBotsList(entries)
+    bulkSummonButton.names = bulkInviteButton.names
+    if not bulkInviteButton.names or bulkInviteButton.names == "" then
+        bulkInviteButton:Disable()
+        bulkSummonButton:Disable()
+        bulkInviteButton:Show()
+        bulkSummonButton:Show()
+        return
+    end
+
+    hasOutsideParty = CompanionList_HasCompanionsOutsideParty(entries)
+    hasInParty = CompanionList_HasCompanionsInParty(entries)
+    hasOnline = CompanionList_HasCompanionsOnline(entries)
+
+    bulkInviteButton:ClearAllPoints()
+    bulkSummonButton:ClearAllPoints()
+    bulkInviteButton:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, 1)
+    bulkSummonButton:SetPoint("BOTTOMLEFT", bulkActionButton, "TOPLEFT", 0, 5)
+
+    if hasOnline then
+        bulkSummonButton.allBots = bulkInviteButton.names
+        bulkSummonButton:Enable()
+        bulkSummonButton:Show()
+    else
+        bulkSummonButton:Hide()
+    end
+
+    if not hasOnline then
+        bulkInviteButton:Disable()
+        bulkInviteButton.action = "invite"
+        bulkInviteButton:SetText("Invite All")
+        bulkInviteButton:Show()
+        bulkSummonButton:Disable()
+        bulkSummonButton:Show()
+        return
+    end
+
+    if hasInParty then
+        bulkInviteButton:ClearAllPoints()
+        bulkInviteButton:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, 1)
+        bulkInviteButton.action = "uninvite"
+        bulkInviteButton:SetText("Uninvite All")
+        bulkInviteButton:Enable()
+        bulkInviteButton:Show()
+    elseif hasOutsideParty then
+        bulkInviteButton:ClearAllPoints()
+        bulkInviteButton:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, 1)
+        bulkInviteButton.action = "invite"
+        bulkInviteButton:SetText("Invite All")
+        bulkInviteButton:Enable()
+        bulkInviteButton:Show()
+    else
+        bulkInviteButton:Hide()
+    end
+end
+
+local function CompanionList_RunBulkAction(button)
+    if not button or not button.allBots or button.allBots == "" or type(SendBotCommand) ~= "function" then
+        return
+    end
+
+    if button.action == "logout" then
+        SendBotCommand(".bot rm " .. button.allBots, "SAY")
+        return
+    end
+
+    SendBotCommand(".bot add " .. button.allBots, "SAY")
+end
+
+local function CompanionList_RunBulkGroupAction(button)
+    local names = nil
+    local timeout = 0.1
+    local i
+
+    if not button or not button.names or button.names == "" then
+        return
+    end
+
+    names = CompanionList_SplitNames(button.names)
+
+    if button.action == "uninvite" then
+        if type(SendBotCommand) ~= "function" then
+            return
+        end
+
+        for i = 1, table.getn(names) do
+            wait(timeout, function(uninviteName)
+                SendBotCommand("leave", "WHISPER", nil, uninviteName)
+            end, names[i])
+            timeout = timeout + 0.1
+        end
+        return
+    end
+
+    if type(InviteByName) ~= "function" then
+        return
+    end
+
+    for i = 1, table.getn(names) do
+        wait(timeout, function(inviteName)
+            InviteByName(inviteName)
+        end, names[i])
+        timeout = timeout + 0.1
+    end
+
+    if type(UpdateBotList) == "function" then
+        UpdateBotList(1)
+    end
+end
+
+local function CompanionList_RunBulkSummonAction(button)
+    local names = nil
+    local timeout = 0.1
+    local i
+
+    if not button or not button.names or button.names == "" or type(SendBotCommand) ~= "function" then
+        return
+    end
+
+    names = CompanionList_SplitNames(button.names)
+
+    for i = 1, table.getn(names) do
+        wait(timeout, function(summonName)
+            SendBotCommand("summon", "WHISPER", nil, summonName)
+        end, names[i])
+        timeout = timeout + 0.1
     end
 end
 
@@ -60,13 +354,37 @@ local function CompanionList_GetRosterEntries()
     local entries = {}
     local seen = {}
     local name, bot
+    local className = nil
+    local level = nil
+    local levelField = nil
+    local observedLevel = nil
 
     if type(botTable) == "table" then
         for name, bot in pairs(botTable) do
             if name and name ~= "" then
+                className = bot and bot["class"] or nil
+                levelField = bot and (bot["level"] or bot["lvl"]) or nil
+                className, level = CompanionList_NormalizeClassAndLevel(className, levelField)
+
+                observedLevel = nil
+                if bot and bot["online"] == true then
+                    observedLevel = CompanionList_GetObservedCompanionLevel(name)
+                    if observedLevel then
+                        companionLevelCache[name] = observedLevel
+                    end
+                end
+
+                if not level and observedLevel then
+                    level = observedLevel
+                end
+                if not level and companionLevelCache[name] then
+                    level = companionLevelCache[name]
+                end
+
                 table.insert(entries, {
                     name = name,
-                    class = bot and bot["class"] or nil,
+                    class = className,
+                    level = level,
                     online = bot and bot["online"] == true
                 })
                 seen[name] = true
@@ -82,16 +400,34 @@ local function CompanionList_GetRosterEntries()
                 name = item.text:GetText()
                 if name and name ~= "" and name ~= "Click!" and not seen[name] then
                     local className = nil
+                    local level = nil
                     local online = false
+                    local observedLevel = nil
 
                     if type(botTable) == "table" and botTable[name] then
                         className = botTable[name]["class"]
+                        className, level = CompanionList_NormalizeClassAndLevel(className, botTable[name]["level"] or botTable[name]["lvl"])
                         online = botTable[name]["online"] == true
+                    end
+
+                    if online then
+                        observedLevel = CompanionList_GetObservedCompanionLevel(name)
+                        if observedLevel then
+                            companionLevelCache[name] = observedLevel
+                        end
+                    end
+
+                    if not level and observedLevel then
+                        level = observedLevel
+                    end
+                    if not level and companionLevelCache[name] then
+                        level = companionLevelCache[name]
                     end
 
                     table.insert(entries, {
                         name = name,
                         class = className,
+                        level = level,
                         online = online
                     })
                     seen[name] = true
@@ -112,6 +448,72 @@ local function CompanionList_GetRosterEntries()
     return entries
 end
 
+CompanionList_GetObservedCompanionLevel = function(name)
+    local i
+    local unitName = nil
+    local level = nil
+    local unitId = nil
+
+    if not name or name == "" or type(UnitLevel) ~= "function" then
+        return nil
+    end
+
+    if type(partyName) == "function" then
+        for i = 1, 5 do
+            if partyName(i) == name then
+                unitId = "party" .. i
+                level = UnitLevel(unitId)
+                if level and level > 0 then
+                    return level
+                end
+            end
+        end
+    end
+
+    if type(UnitName) == "function" and type(UnitExists) == "function" and UnitExists("target") then
+        unitName = UnitName("target")
+        if unitName == name then
+            level = UnitLevel("target")
+            if level and level > 0 then
+                return level
+            end
+        end
+    end
+
+    return nil
+end
+
+CompanionList_NormalizeClassAndLevel = function(rawClass, rawLevel)
+    local className = rawClass
+    local level = rawLevel
+    local levelText = nil
+    local parsedClass = nil
+    local _start = nil
+    local _end = nil
+
+    if type(level) == "string" then
+        level = tonumber(level)
+    end
+
+    if (not level) and type(className) == "string" and className ~= "" then
+        _start, _end, levelText, parsedClass = string.find(className, "^(%d+)%s+(.+)$")
+        if levelText and parsedClass then
+            level = tonumber(levelText)
+            className = parsedClass
+        end
+    end
+
+    if (not level) and type(className) == "string" and className ~= "" then
+        _start, _end, parsedClass, levelText = string.find(className, "^(.+)%s+(%d+)$")
+        if parsedClass and levelText then
+            level = tonumber(levelText)
+            className = parsedClass
+        end
+    end
+
+    return className, level
+end
+
 local function CompanionList_GetClassIcon(className)
     if not className or className == "" then
         return "Interface\\Addons\\Mangosbot\\Images\\role_dps.tga"
@@ -120,21 +522,17 @@ local function CompanionList_GetClassIcon(className)
     return "Interface\\Addons\\Mangosbot\\Images\\cls_" .. string.lower(className) .. ".tga"
 end
 
-local function CompanionList_GetStatusText(entry)
-    if not entry then
-        return "Offline"
-    end
-
-    if entry.online then
-        return "Online"
-    end
-
-    return "Offline"
-end
-
 local function CompanionList_GetDetailText(entry)
     if not entry then
         return "Unknown"
+    end
+
+    if entry.level and entry.class and entry.class ~= "" then
+        return "Level " .. entry.level .. " " .. entry.class
+    end
+
+    if entry.level then
+        return "Level " .. entry.level
     end
 
     if entry.class and entry.class ~= "" then
@@ -149,6 +547,100 @@ local function CompanionList_SetSelection(name)
     if type(QuerySelectedBot) == "function" then
         QuerySelectedBot(name)
     end
+end
+
+local function CompanionList_GetRosterActionTexture(isOnline)
+    if isOnline then
+        return "Interface\\Addons\\Mangosbot\\Images\\logout.tga"
+    end
+
+    return "Interface\\Addons\\Mangosbot\\Images\\login.tga"
+end
+
+local function CompanionList_IsCompanionInParty(name)
+    local i
+
+    if not name or name == "" or type(partyName) ~= "function" then
+        return false
+    end
+
+    for i = 1, 5 do
+        if partyName(i) == name then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function CompanionList_GetRosterActionTooltip(isOnline)
+    if isOnline then
+        return "Logout"
+    end
+
+    return "Login"
+end
+
+local function CompanionList_RunRosterAction(name, isOnline)
+    if not name or name == "" or type(SendBotCommand) ~= "function" then
+        return
+    end
+
+    if isOnline then
+        SendBotCommand(".bot rm " .. name, "SAY")
+        return
+    end
+
+    SendBotCommand(".bot add " .. name, "SAY")
+end
+
+local function CompanionList_GetGroupActionTexture(isInParty)
+    if isInParty then
+        return "Interface\\Addons\\Mangosbot\\Images\\leave.tga"
+    end
+
+    return "Interface\\Addons\\Mangosbot\\Images\\invite.tga"
+end
+
+local function CompanionList_GetGroupActionTooltip(isInParty)
+    if isInParty then
+        return "Uninvite"
+    end
+
+    return "Invite"
+end
+
+local function CompanionList_RunGroupAction(name, isInParty)
+    if not name or name == "" then
+        return
+    end
+
+    if isInParty then
+        if type(SendBotCommand) == "function" then
+            SendBotCommand("leave", "WHISPER", nil, name)
+        end
+        return
+    end
+
+    if type(InviteByName) == "function" then
+        InviteByName(name)
+    end
+end
+
+local function CompanionList_GetSummonActionTexture()
+    return "Interface\\Addons\\Mangosbot\\Images\\summon.tga"
+end
+
+local function CompanionList_GetSummonActionTooltip()
+    return "Summon"
+end
+
+local function CompanionList_RunSummonAction(name)
+    if not name or name == "" or type(SendBotCommand) ~= "function" then
+        return
+    end
+
+    SendBotCommand("summon", "WHISPER", nil, name)
 end
 
 local function CompanionList_CreateRow(parent, index)
@@ -174,15 +666,141 @@ local function CompanionList_CreateRow(parent, index)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 4, 1)
-    row.text:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    row.text:SetPoint("RIGHT", row, "RIGHT", -82, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetText("-")
 
     row.subText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.subText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, 0)
-    row.subText:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    row.subText:SetPoint("RIGHT", row, "RIGHT", -82, 0)
     row.subText:SetJustifyH("LEFT")
     row.subText:SetText("")
+
+    row.summonButton = CreateFrame("Button", nil, row)
+    row.summonButton:SetWidth(20)
+    row.summonButton:SetHeight(20)
+    row.summonButton:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    row.summonButton:EnableMouse(true)
+    row.summonButton:RegisterForClicks("LeftButtonDown")
+
+    row.summonButton.texture = row.summonButton:CreateTexture(nil, "ARTWORK")
+    row.summonButton.texture:SetPoint("TOPLEFT", row.summonButton, "TOPLEFT", 2, -2)
+    row.summonButton.texture:SetWidth(16)
+    row.summonButton.texture:SetHeight(16)
+    row.summonButton.texture:SetTexture(CompanionList_GetSummonActionTexture())
+
+    row.summonButton:SetScript("OnEnter", function()
+        if not this.ownerRow then
+            return
+        end
+
+        this.ownerRow:LockHighlight()
+
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetText(CompanionList_GetSummonActionTooltip())
+        GameTooltip:Show()
+    end)
+    row.summonButton:SetScript("OnLeave", function()
+        if this.ownerRow then
+            CompanionList_UpdateRowVisual(this.ownerRow)
+        end
+
+        GameTooltip:Hide()
+    end)
+    row.summonButton:SetScript("OnClick", function()
+        if not this.ownerRow or not this.ownerRow.companionName then
+            return
+        end
+
+        CompanionList_SetSelection(this.ownerRow.companionName)
+        CompanionList_UpdateAllRowVisuals()
+        CompanionList_RunSummonAction(this.ownerRow.companionName)
+    end)
+    row.summonButton.ownerRow = row
+
+    row.groupButton = CreateFrame("Button", nil, row)
+    row.groupButton:SetWidth(20)
+    row.groupButton:SetHeight(20)
+    row.groupButton:SetPoint("RIGHT", row, "RIGHT", -30, 0)
+    row.groupButton:EnableMouse(true)
+    row.groupButton:RegisterForClicks("LeftButtonDown")
+
+    row.groupButton.texture = row.groupButton:CreateTexture(nil, "ARTWORK")
+    row.groupButton.texture:SetPoint("TOPLEFT", row.groupButton, "TOPLEFT", 2, -2)
+    row.groupButton.texture:SetWidth(16)
+    row.groupButton.texture:SetHeight(16)
+    row.groupButton.texture:SetTexture("Interface\\Addons\\Mangosbot\\Images\\invite.tga")
+
+    row.groupButton:SetScript("OnEnter", function()
+        if not this.ownerRow then
+            return
+        end
+
+        this.ownerRow:LockHighlight()
+
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetText(CompanionList_GetGroupActionTooltip(this.ownerRow.isInParty == true))
+        GameTooltip:Show()
+    end)
+    row.groupButton:SetScript("OnLeave", function()
+        if this.ownerRow then
+            CompanionList_UpdateRowVisual(this.ownerRow)
+        end
+
+        GameTooltip:Hide()
+    end)
+    row.groupButton:SetScript("OnClick", function()
+        if not this.ownerRow or not this.ownerRow.companionName then
+            return
+        end
+
+        CompanionList_SetSelection(this.ownerRow.companionName)
+        CompanionList_UpdateAllRowVisuals()
+        CompanionList_RunGroupAction(this.ownerRow.companionName, this.ownerRow.isInParty == true)
+    end)
+    row.groupButton.ownerRow = row
+
+    row.actionButton = CreateFrame("Button", nil, row)
+    row.actionButton:SetWidth(20)
+    row.actionButton:SetHeight(20)
+    row.actionButton:SetPoint("RIGHT", row, "RIGHT", -52, 0)
+    row.actionButton:EnableMouse(true)
+    row.actionButton:RegisterForClicks("LeftButtonDown")
+
+    row.actionButton.texture = row.actionButton:CreateTexture(nil, "ARTWORK")
+    row.actionButton.texture:SetPoint("TOPLEFT", row.actionButton, "TOPLEFT", 2, -2)
+    row.actionButton.texture:SetWidth(16)
+    row.actionButton.texture:SetHeight(16)
+    row.actionButton.texture:SetTexture("Interface\\Addons\\Mangosbot\\Images\\login.tga")
+
+    row.actionButton:SetScript("OnEnter", function()
+        if not this.ownerRow then
+            return
+        end
+
+        this.ownerRow:LockHighlight()
+
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetText(CompanionList_GetRosterActionTooltip(this.ownerRow.isOnline == true))
+        GameTooltip:Show()
+    end)
+    row.actionButton:SetScript("OnLeave", function()
+        if this.ownerRow then
+            CompanionList_UpdateRowVisual(this.ownerRow)
+        end
+
+        GameTooltip:Hide()
+    end)
+    row.actionButton:SetScript("OnClick", function()
+        if not this.ownerRow or not this.ownerRow.companionName then
+            return
+        end
+
+        CompanionList_SetSelection(this.ownerRow.companionName)
+        CompanionList_UpdateAllRowVisuals()
+        CompanionList_RunRosterAction(this.ownerRow.companionName, this.ownerRow.isOnline == true)
+    end)
+    row.actionButton.ownerRow = row
 
     row:SetScript("OnClick", function()
         if this.companionName and this.companionName ~= "" then
@@ -194,7 +812,7 @@ local function CompanionList_CreateRow(parent, index)
     return row
 end
 
-local function CompanionList_UpdateRowVisual(row)
+CompanionList_UpdateRowVisual = function(row)
     if row.companionName and CurrentBot and row.companionName == CurrentBot then
         row:LockHighlight()
         row.text:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
@@ -211,10 +829,23 @@ local function CompanionList_UpdateRowVisual(row)
     end
 end
 
+CompanionList_UpdateAllRowVisuals = function()
+    local i
+
+    for i = 1, table.getn(rows) do
+        if rows[i] then
+            CompanionList_UpdateRowVisual(rows[i])
+        end
+    end
+end
+
 local function CompanionList_UpdateFromRoster()
     local count = 0
     local entries = CompanionList_GetRosterEntries()
     local i
+
+    CompanionList_UpdateBulkActionButton(entries)
+    CompanionList_UpdateBulkGroupButtons(entries)
 
     if table.getn(entries) == 0 then
         for i = 1, table.getn(rows) do
@@ -233,9 +864,30 @@ local function CompanionList_UpdateFromRoster()
         if row and entry then
             row.companionName = entry.name
             row.isOnline = entry.online == true
-            row.text:SetText(entry.name .. " - " .. CompanionList_GetStatusText(entry))
+            row.isInParty = row.isOnline and CompanionList_IsCompanionInParty(entry.name)
+            row.text:SetText(CompanionList_GetNameText(entry))
             row.subText:SetText(CompanionList_GetDetailText(entry))
             row.icon:SetTexture(CompanionList_GetClassIcon(entry.class))
+            if row.summonButton and row.summonButton.texture then
+                row.summonButton.texture:SetTexture(CompanionList_GetSummonActionTexture())
+                if row.isOnline then
+                    row.summonButton:Show()
+                else
+                    row.summonButton:Hide()
+                end
+            end
+            if row.groupButton and row.groupButton.texture then
+                if row.isOnline then
+                    row.groupButton.texture:SetTexture(CompanionList_GetGroupActionTexture(row.isInParty))
+                    row.groupButton:Show()
+                else
+                    row.groupButton:Hide()
+                end
+            end
+            if row.actionButton and row.actionButton.texture then
+                row.actionButton.texture:SetTexture(CompanionList_GetRosterActionTexture(row.isOnline))
+                row.actionButton:Show()
+            end
             CompanionList_UpdateRowVisual(row)
             row:Show()
             count = count + 1
@@ -243,6 +895,15 @@ local function CompanionList_UpdateFromRoster()
     end
 
     for i = count + 1, table.getn(rows) do
+        if rows[i].summonButton then
+            rows[i].summonButton:Hide()
+        end
+        if rows[i].groupButton then
+            rows[i].groupButton:Hide()
+        end
+        if rows[i].actionButton then
+            rows[i].actionButton:Hide()
+        end
         rows[i]:Hide()
     end
 
@@ -276,6 +937,39 @@ function CompanionList.Init(parent)
 
     panelFrame = CreateFrame("Frame", "Forged_Mangosbot_CompanionPanel", parent)
     panelFrame:SetAllPoints(parent)
+
+    bulkActionButton = CreateFrame("Button", "Forged_Mangosbot_CompanionBulkActionButton", panelFrame, "UIPanelButtonTemplate")
+    bulkActionButton:SetWidth(131)
+    bulkActionButton:SetHeight(21)
+    bulkActionButton:SetPoint("BOTTOMLEFT", panelFrame, "BOTTOMLEFT", -1, 1)
+    bulkActionButton:SetText("Login All")
+    bulkActionButton:Disable()
+    bulkActionButton:Show()
+    bulkActionButton:SetScript("OnClick", function()
+        CompanionList_RunBulkAction(this)
+    end)
+
+    bulkInviteButton = CreateFrame("Button", "Forged_Mangosbot_CompanionBulkInviteButton", panelFrame, "UIPanelButtonTemplate")
+    bulkInviteButton:SetWidth(131)
+    bulkInviteButton:SetHeight(21)
+    bulkInviteButton:SetPoint("BOTTOMRIGHT", panelFrame, "BOTTOMRIGHT", -3, 1)
+    bulkInviteButton:SetText("Invite All")
+    bulkInviteButton:Disable()
+    bulkInviteButton:Show()
+    bulkInviteButton:SetScript("OnClick", function()
+        CompanionList_RunBulkGroupAction(this)
+    end)
+
+    bulkSummonButton = CreateFrame("Button", "Forged_Mangosbot_CompanionBulkSummonButton", panelFrame, "UIPanelButtonTemplate")
+    bulkSummonButton:SetWidth(131)
+    bulkSummonButton:SetHeight(21)
+    bulkSummonButton:SetPoint("BOTTOMLEFT", bulkActionButton, "TOPLEFT", 0, 5)
+    bulkSummonButton:SetText("Summon All")
+    bulkSummonButton:Disable()
+    bulkSummonButton:Show()
+    bulkSummonButton:SetScript("OnClick", function()
+        CompanionList_RunBulkSummonAction(this)
+    end)
 
     listInset = CreateFrame("Frame", nil, panelFrame)
     listInset:SetPoint("TOPLEFT", panelFrame, "TOPLEFT", 0, 0)
@@ -341,8 +1035,6 @@ local function CompanionList_ShowSocialSubFrame()
         end
     end
 
-    CompanionList_SetRaidBackground()
-
     local titleText = getglobal("FriendsFrameTitleText")
     if titleText and titleText.SetText then
         titleText:SetText("Companion List")
@@ -352,6 +1044,9 @@ local function CompanionList_ShowSocialSubFrame()
         friendsFrame.selectedTab = socialTabId
         PanelTemplates_SetTab(friendsFrame, socialTabId)
     end
+
+    CompanionList.Init(socialContentFrame)
+    CompanionList.Refresh()
 end
 
 local function CompanionList_BuildSocialPanel()
@@ -448,6 +1143,7 @@ function CompanionList.SetupSocialTab()
         local originalShowSubFrame = FriendsFrame_ShowSubFrame
         FriendsFrame_ShowSubFrame = function(frameName)
             if frameName == socialSubFrameName then
+                socialShouldRestoreOnShow = true
                 local i
                 for i = 1, table.getn(socialBaseSubFrames) do
                     local subFrame = getglobal(socialBaseSubFrames[i])
@@ -476,10 +1172,43 @@ function CompanionList.SetupSocialTab()
                 if socialSubFrame then
                     socialSubFrame:Hide()
                 end
+
+                socialShouldRestoreOnShow = false
             end
         end
 
         socialShowSubFrameHooked = true
+    end
+
+    if not friendsFrame._forgedCompanionOnShowHooked then
+        local originalFriendsOnShow = friendsFrame:GetScript("OnShow")
+        friendsFrame:SetScript("OnShow", function()
+            if originalFriendsOnShow then
+                originalFriendsOnShow()
+            end
+
+            if socialTabId > 0 and socialShouldRestoreOnShow then
+                socialShouldRestoreOnShow = false
+                CompanionList_ShowSocialSubFrame()
+            end
+        end)
+        friendsFrame._forgedCompanionOnShowHooked = true
+    end
+
+    if not friendsFrame._forgedCompanionOnHideHooked then
+        local originalFriendsOnHide = friendsFrame:GetScript("OnHide")
+        friendsFrame:SetScript("OnHide", function()
+            if socialTabId > 0 then
+                socialShouldRestoreOnShow = (friendsFrame.selectedTab == socialTabId)
+            else
+                socialShouldRestoreOnShow = false
+            end
+
+            if originalFriendsOnHide then
+                originalFriendsOnHide()
+            end
+        end)
+        friendsFrame._forgedCompanionOnHideHooked = true
     end
 
     if type(FRIENDSFRAME_SUBFRAMES) == "table" then
