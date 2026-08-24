@@ -15,4 +15,5 @@ CommandPanel.xml
 Registry.lua
 MacroBridge.lua
 CompanionList.lua
+BookOfCommands.lua
 Bindings.xml
