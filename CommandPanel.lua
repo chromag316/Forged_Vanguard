@@ -1,22 +1,22 @@
 Forged_Mangosbot = Forged_Mangosbot or {}
 
-local BookOfCommands = {}
-Forged_Mangosbot.BookOfCommands = BookOfCommands
-Forged_Mangosbot_BookOfCommands_Loaded = true
+local CommandPanel = {}
+Forged_Mangosbot.CommandPanel = CommandPanel
+Forged_Mangosbot_CommandPanel_Loaded = true
 
 local MainWindow = Forged_Mangosbot.MainWindow or {}
 
-local function BookOfCommands_Print(message)
+local function CommandPanel_Print(message)
     if DEFAULT_CHAT_FRAME and message then
         DEFAULT_CHAT_FRAME:AddMessage(message)
     end
 end
 
 local frame = nil
-local frameName = MainWindow.GetFrameName and MainWindow.GetFrameName() or "Forged_Mangosbot_BookOfCommandsFrame"
+local frameName = MainWindow.GetFrameName and MainWindow.GetFrameName() or "Forged_Mangosbot_CommandPanelFrame"
 local tabButtons = {}
 local gridButtons = {}
-local BookOfCommands_Refresh
+local CommandPanel_Refresh
 local currentCategory = "movement"
 local currentPage = 1
 local perPage = 12
@@ -32,17 +32,17 @@ local categories = {
     { key = "inventory", label = "Inventory", icon = "INV_Box_02" }
 }
 
-local function BookOfCommands_IsCategorySelected(categoryKey)
+local function CommandPanel_IsCategorySelected(categoryKey)
     return currentCategory == categoryKey
 end
 
-local function BookOfCommands_SelectCategory(categoryKey)
+local function CommandPanel_SelectCategory(categoryKey)
     currentCategory = categoryKey
     currentPage = 1
-    BookOfCommands_Refresh()
+    CommandPanel_Refresh()
 end
 
-local function BookOfCommands_ResolveCategoryIcon(category)
+local function CommandPanel_ResolveCategoryIcon(category)
     if not category or not category.icon then
         return "Interface\\Icons\\INV_Misc_QuestionMark"
     end
@@ -59,7 +59,7 @@ local function BookOfCommands_ResolveCategoryIcon(category)
     return "Interface\\Icons\\" .. icon
 end
 
-local function BookOfCommands_ResolveIcon(def)
+local function CommandPanel_ResolveIcon(def)
     if not def or not def.icon then
         return "Interface\\Icons\\INV_Misc_QuestionMark"
     end
@@ -76,7 +76,7 @@ local function BookOfCommands_ResolveIcon(def)
     return "Interface\\Addons\\Mangosbot\\Images\\" .. icon .. ".tga"
 end
 
-local function BookOfCommands_GetCategoryIndex(category)
+local function CommandPanel_GetCategoryIndex(category)
     local i
     for i = 1, table.getn(categories) do
         if categories[i].key == category then
@@ -86,7 +86,7 @@ local function BookOfCommands_GetCategoryIndex(category)
     return 1
 end
 
-local function BookOfCommands_GetCommandsForCurrentCategory()
+local function CommandPanel_GetCommandsForCurrentCategory()
     local registry = Forged_Mangosbot.Registry
     local all = registry and registry.GetAll and registry.GetAll() or {}
     local list = {}
@@ -118,7 +118,7 @@ local function BookOfCommands_GetCommandsForCurrentCategory()
     return list
 end
 
-local function BookOfCommands_RunVisual(def, button)
+local function CommandPanel_RunVisual(def, button)
     local proxy = {}
     local key, value
     for key, value in pairs(def) do
@@ -133,7 +133,7 @@ local function BookOfCommands_RunVisual(def, button)
     end
 end
 
-local function BookOfCommands_UpdatePageText(total)
+local function CommandPanel_UpdatePageText(total)
     local maxPage = math.max(1, math.ceil(total / perPage))
     if currentPage > maxPage then
         currentPage = maxPage
@@ -147,7 +147,7 @@ local function BookOfCommands_UpdatePageText(total)
     if MainWindow.SetPageText then
         MainWindow.SetPageText(pageTextValue)
     else
-        getglobal("Forged_Mangosbot_BookOfCommandsFramePageText"):SetText(pageTextValue)
+        getglobal("Forged_Mangosbot_CommandPanelFramePageText"):SetText(pageTextValue)
     end
 
     local prevEnabled = currentPage > 1
@@ -156,8 +156,8 @@ local function BookOfCommands_UpdatePageText(total)
     if MainWindow.SetPageButtonsEnabled then
         MainWindow.SetPageButtonsEnabled(prevEnabled, nextEnabled)
     else
-        local prev = getglobal("Forged_Mangosbot_BookOfCommandsFramePrevPage")
-        local next = getglobal("Forged_Mangosbot_BookOfCommandsFrameNextPage")
+        local prev = getglobal("Forged_Mangosbot_CommandPanelFramePrevPage")
+        local next = getglobal("Forged_Mangosbot_CommandPanelFrameNextPage")
 
         if prev then
             if prevEnabled then
@@ -177,14 +177,14 @@ local function BookOfCommands_UpdatePageText(total)
     end
 end
 
-local function BookOfCommands_UpdateWindowTitle()
+local function CommandPanel_UpdateWindowTitle()
     local titleTextValue = "Book of Commands"
     if MainWindow.SetTitle then
         MainWindow.SetTitle(titleTextValue)
         return
     end
 
-    local titleText = getglobal("Forged_Mangosbot_BookOfCommandsFrameTitle")
+    local titleText = getglobal("Forged_Mangosbot_CommandPanelFrameTitle")
     if not titleText then
         return
     end
@@ -192,7 +192,7 @@ local function BookOfCommands_UpdateWindowTitle()
     titleText:SetText(titleTextValue)
 end
 
-local function BookOfCommands_ApplyCategoryTabState(tab, selected)
+local function CommandPanel_ApplyCategoryTabState(tab, selected)
     tab:SetChecked(selected)
 
     if tab.bg then
@@ -212,22 +212,22 @@ local function BookOfCommands_ApplyCategoryTabState(tab, selected)
     end
 end
 
-local function BookOfCommands_ConfigureCategoryTab(tab, category)
+local function CommandPanel_ConfigureCategoryTab(tab, category)
     tab.categoryKey = category.key
     tab.tooltipText = category.label
-    tab.icon:SetTexture(BookOfCommands_ResolveCategoryIcon(category))
+    tab.icon:SetTexture(CommandPanel_ResolveCategoryIcon(category))
 end
 
-local function BookOfCommands_UpdateTabs()
+local function CommandPanel_UpdateTabs()
     local i
     for i = 1, table.getn(tabButtons) do
         local tab = tabButtons[i]
-        BookOfCommands_ApplyCategoryTabState(tab, BookOfCommands_IsCategorySelected(tab.categoryKey))
+        CommandPanel_ApplyCategoryTabState(tab, CommandPanel_IsCategorySelected(tab.categoryKey))
     end
 end
 
-local function BookOfCommands_UpdateGrid()
-    local commands = BookOfCommands_GetCommandsForCurrentCategory()
+local function CommandPanel_UpdateGrid()
+    local commands = CommandPanel_GetCommandsForCurrentCategory()
     local total = table.getn(commands)
     local startIndex = (currentPage - 1) * perPage + 1
     local i
@@ -239,7 +239,7 @@ local function BookOfCommands_UpdateGrid()
 
         if def then
             button.def = def
-            button.icon:SetTexture(BookOfCommands_ResolveIcon(def))
+            button.icon:SetTexture(CommandPanel_ResolveIcon(def))
             button.icon:Show()
             button.nameText:SetText(def.label or def.tooltip or def.id or "")
             button:Enable()
@@ -254,13 +254,13 @@ local function BookOfCommands_UpdateGrid()
         button:Show()
     end
 
-    BookOfCommands_UpdatePageText(total)
+    CommandPanel_UpdatePageText(total)
 end
 
-local function BookOfCommands_ShowGridPanel()
-    local companionContainer = MainWindow.GetCompanionContainer and MainWindow.GetCompanionContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameCompanionContainer")
-    local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameGridContainer")
-    local tabContainer = MainWindow.GetTabContainer and MainWindow.GetTabContainer() or getglobal("Forged_Mangosbot_BookOfCommandsFrameTabContainer")
+local function CommandPanel_ShowGridPanel()
+    local companionContainer = MainWindow.GetCompanionContainer and MainWindow.GetCompanionContainer() or getglobal("Forged_Mangosbot_CommandPanelFrameCompanionContainer")
+    local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal("Forged_Mangosbot_CommandPanelFrameGridContainer")
+    local tabContainer = MainWindow.GetTabContainer and MainWindow.GetTabContainer() or getglobal("Forged_Mangosbot_CommandPanelFrameTabContainer")
 
     if companionContainer then
         companionContainer:Hide()
@@ -271,16 +271,16 @@ local function BookOfCommands_ShowGridPanel()
     if gridContainer then
         gridContainer:Show()
     end
-    BookOfCommands_UpdateGrid()
+    CommandPanel_UpdateGrid()
 end
 
-BookOfCommands_Refresh = function()
-    BookOfCommands_UpdateWindowTitle()
-    BookOfCommands_UpdateTabs()
-    BookOfCommands_ShowGridPanel()
+CommandPanel_Refresh = function()
+    CommandPanel_UpdateWindowTitle()
+    CommandPanel_UpdateTabs()
+    CommandPanel_ShowGridPanel()
 end
 
-local function BookOfCommands_CreateTab(parent, category, index)
+local function CommandPanel_CreateTab(parent, category, index)
     local tab = CreateFrame("CheckButton", nil, parent)
     tab:SetWidth(32)
     tab:SetHeight(32)
@@ -304,7 +304,7 @@ local function BookOfCommands_CreateTab(parent, category, index)
     tab.flash:SetPoint("CENTER", tab, "CENTER", 0, 0)
     tab.flash:SetBlendMode("ADD")
     tab.flash:Hide()
-    BookOfCommands_ConfigureCategoryTab(tab, category)
+    CommandPanel_ConfigureCategoryTab(tab, category)
 
     tab:SetScript("OnEnter", function()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
@@ -317,13 +317,13 @@ local function BookOfCommands_CreateTab(parent, category, index)
     end)
 
     tab:SetScript("OnClick", function()
-        BookOfCommands_SelectCategory(this.categoryKey)
+        CommandPanel_SelectCategory(this.categoryKey)
     end)
 
     return tab
 end
 
-local function BookOfCommands_CreateGridButton(parent, index)
+local function CommandPanel_CreateGridButton(parent, index)
     local button = CreateFrame("CheckButton", nil, parent)
     button:SetWidth(37)
     button:SetHeight(37)
@@ -409,7 +409,7 @@ local function BookOfCommands_CreateGridButton(parent, index)
     button:SetScript("OnClick", function()
         if this.def then
             if arg1 == "RightButton" then
-                BookOfCommands_RunVisual(this.def, this)
+                CommandPanel_RunVisual(this.def, this)
             end
         end
     end)
@@ -423,11 +423,11 @@ local function BookOfCommands_CreateGridButton(parent, index)
     return button
 end
 
-local function BookOfCommands_SetupPositionPersistence()
+local function CommandPanel_SetupPositionPersistence()
     -- Intentionally disabled so the frame behaves like a managed Blizzard panel.
 end
 
-local function BookOfCommands_ShowPanel()
+local function CommandPanel_ShowPanel()
     if not frame then
         return
     end
@@ -447,7 +447,7 @@ local function BookOfCommands_ShowPanel()
     end
 end
 
-local function BookOfCommands_HidePanel()
+local function CommandPanel_HidePanel()
     if not frame then
         return
     end
@@ -464,44 +464,44 @@ local function BookOfCommands_HidePanel()
     end
 end
 
-local function BookOfCommands_ApplyLeftPanelPosition()
+local function CommandPanel_ApplyLeftPanelPosition()
     if MainWindow.ApplyLeftPanelPosition then
         MainWindow.ApplyLeftPanelPosition()
     end
 end
 
-local function BookOfCommands_ApplySpellBookSize()
+local function CommandPanel_ApplySpellBookSize()
     if MainWindow.ApplySpellBookSize then
         MainWindow.ApplySpellBookSize()
     end
 end
 
-function BookOfCommands.Toggle()
+function CommandPanel.Toggle()
     if not frame then
-        BookOfCommands.Init()
+        CommandPanel.Init()
     end
 
     if not frame then
-        BookOfCommands_Print("Forged_Mangosbot: Book of Commands frame is missing. Please check for XML load errors on login.")
+        CommandPanel_Print("Forged_Mangosbot: Book of Commands frame is missing. Please check for XML load errors on login.")
         return
     end
 
     if frame:IsVisible() then
-        BookOfCommands_HidePanel()
+        CommandPanel_HidePanel()
     else
-        BookOfCommands_ShowPanel()
-        BookOfCommands_Refresh()
+        CommandPanel_ShowPanel()
+        CommandPanel_Refresh()
     end
 end
 
-function BookOfCommands.Init()
+function CommandPanel.Init()
     if frame then
         return
     end
 
     frame = MainWindow.Init and MainWindow.Init() or getglobal(frameName)
     if not frame then
-        BookOfCommands_Print("Forged_Mangosbot: missing frame 'Forged_Mangosbot_BookOfCommandsFrame'.")
+        CommandPanel_Print("Forged_Mangosbot: missing frame 'Forged_Mangosbot_CommandPanelFrame'.")
         return
     end
 
@@ -527,8 +527,8 @@ function BookOfCommands.Init()
         frame:SetClampedToScreen(true)
     end
 
-    BookOfCommands_ApplySpellBookSize()
-    BookOfCommands_ApplyLeftPanelPosition()
+    CommandPanel_ApplySpellBookSize()
+    CommandPanel_ApplyLeftPanelPosition()
 
     local tabContainer = MainWindow.GetTabContainer and MainWindow.GetTabContainer() or getglobal(frameName .. "TabContainer")
     local gridContainer = MainWindow.GetGridContainer and MainWindow.GetGridContainer() or getglobal(frameName .. "GridContainer")
@@ -557,35 +557,35 @@ function BookOfCommands.Init()
 
     local i
     for i = 1, table.getn(categories) do
-        tabButtons[i] = BookOfCommands_CreateTab(tabContainer, categories[i], i)
+        tabButtons[i] = CommandPanel_CreateTab(tabContainer, categories[i], i)
     end
 
     for i = 1, perPage do
-        gridButtons[i] = BookOfCommands_CreateGridButton(gridContainer, i)
+        gridButtons[i] = CommandPanel_CreateGridButton(gridContainer, i)
     end
 
     getglobal(frameName .. "PrevPage"):SetScript("OnClick", function()
         if currentPage > 1 then
             currentPage = currentPage - 1
-            BookOfCommands_Refresh()
+            CommandPanel_Refresh()
         end
     end)
 
     getglobal(frameName .. "NextPage"):SetScript("OnClick", function()
         currentPage = currentPage + 1
-        BookOfCommands_Refresh()
+        CommandPanel_Refresh()
     end)
 
     frame:SetScript("OnShow", function()
-        BookOfCommands_ApplySpellBookSize()
-        BookOfCommands_ApplyLeftPanelPosition()
-        BookOfCommands_Refresh()
+        CommandPanel_ApplySpellBookSize()
+        CommandPanel_ApplyLeftPanelPosition()
+        CommandPanel_Refresh()
     end)
 
-    BookOfCommands_SetupPositionPersistence()
-    BookOfCommands_Refresh()
+    CommandPanel_SetupPositionPersistence()
+    CommandPanel_Refresh()
 end
 
 -- Publish stable hooks so the core file can re-bind the module table if needed.
-Forged_Mangosbot_BookOfCommands_Init = BookOfCommands.Init
-Forged_Mangosbot_BookOfCommands_Toggle = BookOfCommands.Toggle
+Forged_Mangosbot_CommandPanel_Init = CommandPanel.Init
+Forged_Mangosbot_CommandPanel_Toggle = CommandPanel.Toggle

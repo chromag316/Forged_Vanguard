@@ -3,7 +3,7 @@ Forged_Mangosbot = Forged_Mangosbot or {}
 local MainWindow = {}
 Forged_Mangosbot.MainWindow = MainWindow
 
-local frameName = "Forged_Mangosbot_BookOfCommandsFrame"
+local frameName = "Forged_Mangosbot_CommandPanelFrame"
 local frame = nil
 local titleText = nil
 local pageText = nil

@@ -1,6 +1,6 @@
 <Bindings>
     <Binding name="FORGED_MANGOSBOT_TOGGLE" header="FORGED_MANGOSBOT">
-        Forged_Mangosbot_ToggleBookOfCommands();
+        Forged_Mangosbot_ToggleCommandPanel();
     </Binding>
     <Binding name="FORGED_MANGOSBOT_FOLLOW">
         Forged_Mangosbot_BindingFollow();

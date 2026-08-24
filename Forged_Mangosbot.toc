@@ -10,8 +10,8 @@
 
 core.lua
 MainWindow.lua
-BookOfCommands.lua
-BookOfCommands.xml
+CommandPanel.lua
+CommandPanel.xml
 Registry.lua
 MacroBridge.lua
 CompanionList.lua

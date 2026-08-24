@@ -4,7 +4,7 @@
     xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd"
 >
-    <Frame name="Forged_Mangosbot_BookOfCommandsFrame" parent="UIParent" hidden="true" movable="false" enableMouse="true" toplevel="true">
+    <Frame name="Forged_Mangosbot_CommandPanelFrame" parent="UIParent" hidden="true" movable="false" enableMouse="true" toplevel="true">
         <Size>
             <AbsDimension x="540" y="440"/>
         </Size>
@@ -108,7 +108,7 @@
         </Frames>
         <Scripts>
             <OnLoad>
-                Forged_Mangosbot_BookOfCommands_FrameLoaded = true
+                Forged_Mangosbot_CommandPanel_FrameLoaded = true
             </OnLoad>
         </Scripts>
     </Frame>

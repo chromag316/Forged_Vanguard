@@ -21,11 +21,11 @@ local function Forged_Mangosbot_Print(message)
     end
 end
 
-local function Forged_Mangosbot_ResolveBookOfCommandsHandlers()
+local function Forged_Mangosbot_ResolveCommandPanelHandlers()
     local initFn = nil
     local toggleFn = nil
 
-    local module = Forged_Mangosbot.BookOfCommands
+    local module = Forged_Mangosbot.CommandPanel
     if type(module) == "table" then
         if type(module.Init) == "function" then
             initFn = module.Init
@@ -35,35 +35,35 @@ local function Forged_Mangosbot_ResolveBookOfCommandsHandlers()
         end
     end
 
-    if not initFn and type(Forged_Mangosbot_BookOfCommands_Init) == "function" then
-        initFn = Forged_Mangosbot_BookOfCommands_Init
+    if not initFn and type(Forged_Mangosbot_CommandPanel_Init) == "function" then
+        initFn = Forged_Mangosbot_CommandPanel_Init
     end
-    if not toggleFn and type(Forged_Mangosbot_BookOfCommands_Toggle) == "function" then
-        toggleFn = Forged_Mangosbot_BookOfCommands_Toggle
+    if not toggleFn and type(Forged_Mangosbot_CommandPanel_Toggle) == "function" then
+        toggleFn = Forged_Mangosbot_CommandPanel_Toggle
     end
 
     if (not initFn or not toggleFn) and type(dofile) == "function" then
-        pcall(dofile, "Interface\\AddOns\\Forged_Mangosbot\\BookOfCommands.lua")
-        if not initFn and type(Forged_Mangosbot_BookOfCommands_Init) == "function" then
-            initFn = Forged_Mangosbot_BookOfCommands_Init
+        pcall(dofile, "Interface\\AddOns\\Forged_Mangosbot\\CommandPanel.lua")
+        if not initFn and type(Forged_Mangosbot_CommandPanel_Init) == "function" then
+            initFn = Forged_Mangosbot_CommandPanel_Init
         end
-        if not toggleFn and type(Forged_Mangosbot_BookOfCommands_Toggle) == "function" then
-            toggleFn = Forged_Mangosbot_BookOfCommands_Toggle
+        if not toggleFn and type(Forged_Mangosbot_CommandPanel_Toggle) == "function" then
+            toggleFn = Forged_Mangosbot_CommandPanel_Toggle
         end
     end
 
     if initFn and toggleFn then
-        Forged_Mangosbot.BookOfCommands = Forged_Mangosbot.BookOfCommands or {}
-        Forged_Mangosbot.BookOfCommands.Init = initFn
-        Forged_Mangosbot.BookOfCommands.Toggle = toggleFn
+        Forged_Mangosbot.CommandPanel = Forged_Mangosbot.CommandPanel or {}
+        Forged_Mangosbot.CommandPanel.Init = initFn
+        Forged_Mangosbot.CommandPanel.Toggle = toggleFn
         return initFn, toggleFn
     end
 
     return nil, nil
 end
 
-local function Forged_Mangosbot_InstallXmlBookOfCommandsHandlers()
-    local frameName = "Forged_Mangosbot_BookOfCommandsFrame"
+local function Forged_Mangosbot_InstallXmlCommandPanelHandlers()
+    local frameName = "Forged_Mangosbot_CommandPanelFrame"
 
     local function initFn()
         local frame = getglobal(frameName)
@@ -122,24 +122,24 @@ local function Forged_Mangosbot_InstallXmlBookOfCommandsHandlers()
         return nil, nil
     end
 
-    Forged_Mangosbot.BookOfCommands = Forged_Mangosbot.BookOfCommands or {}
-    Forged_Mangosbot.BookOfCommands.Init = initFn
-    Forged_Mangosbot.BookOfCommands.Toggle = toggleFn
+    Forged_Mangosbot.CommandPanel = Forged_Mangosbot.CommandPanel or {}
+    Forged_Mangosbot.CommandPanel.Init = initFn
+    Forged_Mangosbot.CommandPanel.Toggle = toggleFn
 
     return initFn, toggleFn
 end
 
-local function Forged_Mangosbot_ValidateBookOfCommandsModule()
-    local initFn, toggleFn = Forged_Mangosbot_ResolveBookOfCommandsHandlers()
+local function Forged_Mangosbot_ValidateCommandPanelModule()
+    local initFn, toggleFn = Forged_Mangosbot_ResolveCommandPanelHandlers()
     if not initFn or not toggleFn then
-        initFn, toggleFn = Forged_Mangosbot_InstallXmlBookOfCommandsHandlers()
+        initFn, toggleFn = Forged_Mangosbot_InstallXmlCommandPanelHandlers()
     end
     if not initFn or not toggleFn then
-        local loadedFlag = tostring(Forged_Mangosbot_BookOfCommands_Loaded)
-        local initFlag = tostring(type(Forged_Mangosbot_BookOfCommands_Init) == "function")
-        local toggleFlag = tostring(type(Forged_Mangosbot_BookOfCommands_Toggle) == "function")
-        local frameLoadedFlag = tostring(Forged_Mangosbot_BookOfCommands_FrameLoaded)
-        Forged_Mangosbot_Print("Forged_Mangosbot: Book of Commands module did not load. loaded=" .. loadedFlag .. " init=" .. initFlag .. " toggle=" .. toggleFlag .. " frameLoaded=" .. frameLoadedFlag .. ". Check BookOfCommands.lua and BookOfCommands.xml.")
+        local loadedFlag = tostring(Forged_Mangosbot_CommandPanel_Loaded)
+        local initFlag = tostring(type(Forged_Mangosbot_CommandPanel_Init) == "function")
+        local toggleFlag = tostring(type(Forged_Mangosbot_CommandPanel_Toggle) == "function")
+        local frameLoadedFlag = tostring(Forged_Mangosbot_CommandPanel_FrameLoaded)
+        Forged_Mangosbot_Print("Forged_Mangosbot: Book of Commands module did not load. loaded=" .. loadedFlag .. " init=" .. initFlag .. " toggle=" .. toggleFlag .. " frameLoaded=" .. frameLoadedFlag .. ". Check CommandPanel.lua and CommandPanel.xml.")
         return false, nil, nil
     end
 
@@ -332,7 +332,7 @@ local function Forged_Mangosbot_SetupSlashCommands()
     SLASH_FORGEDMANGOSBOT1 = "/forgedbot"
     SLASH_FORGEDMANGOSBOT2 = "/fmb"
     SlashCmdList.FORGEDMANGOSBOT = function()
-        local ok, initFn, toggleFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+        local ok, initFn, toggleFn = Forged_Mangosbot_ValidateCommandPanelModule()
         if not ok then
             return
         end
@@ -369,7 +369,7 @@ function Forged_Mangosbot_Initialize()
         Forged_Mangosbot.MacroBridge.Cleanup()
     end
 
-    local ok, initFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+    local ok, initFn = Forged_Mangosbot_ValidateCommandPanelModule()
     if ok then
         initFn()
     end
@@ -381,8 +381,8 @@ function Forged_Mangosbot_Initialize()
     Forged_Mangosbot_HookUnitPopupMenu()
 end
 
-function Forged_Mangosbot_ToggleBookOfCommands()
-    local ok, _, toggleFn = Forged_Mangosbot_ValidateBookOfCommandsModule()
+function Forged_Mangosbot_ToggleCommandPanel()
+    local ok, _, toggleFn = Forged_Mangosbot_ValidateCommandPanelModule()
     if ok then
         toggleFn()
     end
