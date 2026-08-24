@@ -514,14 +514,6 @@ CompanionList_NormalizeClassAndLevel = function(rawClass, rawLevel)
     return className, level
 end
 
-local function CompanionList_GetClassIcon(className)
-    if not className or className == "" then
-        return "Interface\\Addons\\Mangosbot\\Images\\role_dps.tga"
-    end
-
-    return "Interface\\Addons\\Mangosbot\\Images\\cls_" .. string.lower(className) .. ".tga"
-end
-
 local function CompanionList_GetDetailText(entry)
     if not entry then
         return "Unknown"
@@ -658,14 +650,8 @@ local function CompanionList_CreateRow(parent, index)
     end
     row:UnlockHighlight()
 
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetWidth(16)
-    row.icon:SetHeight(16)
-    row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -4)
-    row.icon:SetTexture("Interface\\Addons\\Mangosbot\\Images\\role_dps.tga")
-
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 4, 1)
+    row.text:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -3)
     row.text:SetPoint("RIGHT", row, "RIGHT", -82, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetText("-")
@@ -867,7 +853,6 @@ local function CompanionList_UpdateFromRoster()
             row.isInParty = row.isOnline and CompanionList_IsCompanionInParty(entry.name)
             row.text:SetText(CompanionList_GetNameText(entry))
             row.subText:SetText(CompanionList_GetDetailText(entry))
-            row.icon:SetTexture(CompanionList_GetClassIcon(entry.class))
             if row.summonButton and row.summonButton.texture then
                 row.summonButton.texture:SetTexture(CompanionList_GetSummonActionTexture())
                 if row.isOnline then
