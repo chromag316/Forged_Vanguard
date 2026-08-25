@@ -34,6 +34,193 @@ local currentPage = 1
 local totalPages = 1
 local socketsPerPage = 12
 
+-- Resolve a command's icon path. Mirror CommandPanel_ResolveIcon: bare names
+-- resolve to the Mangosbot image folder, absolute paths pass through.
+local function BookOfCommands_ResolveIcon(def)
+    if not def or not def.icon then
+        return "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
+
+    local icon = def.icon
+    if string.find(icon, "\\") or string.find(icon, "/") then
+        return icon
+    end
+
+    if string.find(icon, "%.") then
+        return icon
+    end
+
+    return "Interface\\Addons\\Mangosbot\\Images\\" .. icon .. ".tga"
+end
+
+-- Movement commands shown in the book, self-contained so the book does not
+-- depend on the CommandPanel registry. These mirror the roster panel's group
+-- movement toolbar buttons: clicking one orders the whole party.
+--
+-- group_follow = "Follow me" (order the party to follow you)
+-- group_stay   = "Stay in place" (order the party to stay)
+local BookOfCommands_MovementCommands = {
+    { id = "movement.group_follow", label = "Follow", icon = "Interface\\Icons\\follow", strategy = "follow", tooltip = "Order companions in party to follow you", group = true, emote = "follow", command = {[0] = "#a follow ?"}, index = 0 },
+    { id = "movement.group_stay", label = "Stay", icon = "Interface\\Icons\\stay", strategy = "stay", tooltip = "Order companions in party to stay", group = true, emote = "wait", command = {[0] = "#a stay ?"}, index = 1 }
+}
+
+-- Return a shallow copy of the movement commands (they are re-bound on every
+-- page refresh so the sockets pick up the latest command tables).
+local function BookOfCommands_GetMovementCommands()
+    local list = {}
+    local i
+    for i = 1, table.getn(BookOfCommands_MovementCommands) do
+        local src = BookOfCommands_MovementCommands[i]
+        local def = {}
+        local key, value
+        for key, value in pairs(src) do
+            if key == "command" and type(value) == "table" then
+                def.command = {}
+                local ck, cv
+                for ck, cv in pairs(value) do
+                    def.command[ck] = cv
+                end
+            else
+                def[key] = value
+            end
+        end
+        table.insert(list, def)
+    end
+    return list
+end
+
+-- Executes a BookOfCommands command dropped on an action bar. Macro bodies are
+-- strings run in the global scope, so the macro calls this global entry which
+-- then reaches the book's own command table.
+local function BookOfCommands_FindDef(id)
+    local i
+    for i = 1, table.getn(BookOfCommands_MovementCommands) do
+        if BookOfCommands_MovementCommands[i].id == id then
+            return BookOfCommands_MovementCommands[i]
+        end
+    end
+    return nil
+end
+
+local function BookOfCommands_ExecuteCommand(id)
+    local def = BookOfCommands_FindDef(id)
+    if def and type(ToolBarButtonOnClick) == "function" then
+        ToolBarButtonOnClick(def, false)
+    end
+end
+Forged_Mangosbot_BookOfCommandsRun = BookOfCommands_ExecuteCommand
+
+-- Drag-to-actionbar support. In WoW (vanilla/TBC) custom addon commands can only
+-- be bound to an action bar through a macro; there is no macro-free binding for
+-- arbitrary /script commands. To keep the footprint small we reuse one cached
+-- macro per command instead of creating a new one on every drag.
+local MACRO_NAME_PREFIX = "MBC_"
+local MACRO_LIMIT = 36
+
+local function BookOfCommands_HashId(id)
+    local hash = 0
+    local i
+    for i = 1, string.len(id) do
+        local ch = string.byte(id, i)
+        hash = math.mod((hash * 33 + ch), 2147483647)
+    end
+    return hash
+end
+
+-- Name of the macro created for a command. Use the command's short label
+-- ("Follow" / "Stay") since vanilla 1.12 caps macro names at 16 characters.
+-- Falls back to a hashed name if a def has no label.
+local function BookOfCommands_MacroNameFor(def)
+    local label = def and def.label
+    if type(label) == "string" and label ~= "" then
+        return string.sub(label, 1, 16)
+    end
+    return string.sub(MACRO_NAME_PREFIX .. tostring(BookOfCommands_HashId(def and def.id or "?")), 1, 16)
+end
+
+local function BookOfCommands_EnsureDB()
+    if type(Forged_MangosbotMacroDB) ~= "table" then
+        Forged_MangosbotMacroDB = {}
+    end
+end
+
+-- The macro icon parameter is a texture name (string), and custom textures live
+-- in Interface\\Icons. Point each macro at the same custom icon the book button
+-- shows, so a dragged command lands on the action bar with the same art.
+-- This client's CreateMacro strictly requires a numeric macro icon index. Index
+-- 1 is the default question-mark icon; use it for all commands so the macro and
+-- the book button both show the same question mark.
+local function BookOfCommands_MacroIconFor(id)
+    return 1 -- INV_Misc_QuestionMark default
+end
+
+-- The texture a given macro icon index renders to. This is what the book button
+-- displays, so it exactly matches the icon the created macro / action-bar button
+-- uses. Falls back to a safe default if the readback is unavailable.
+local function BookOfCommands_MacroTexture(def)
+    local macroIcon = BookOfCommands_MacroIconFor(def.id)
+    local texture = nil
+    if type(GetMacroIconInfo) == "function" then
+        texture = GetMacroIconInfo(macroIcon)
+    end
+    if type(texture) == "string" and texture ~= "" then
+        -- GetMacroIconInfo may return a bare icon name or a full path; SetTexture
+        -- needs a full Interface\\Icons path, so normalize either form here.
+        if string.find(texture, "\\") or string.find(texture, "/") then
+            return texture
+        end
+        return "Interface\\Icons\\" .. texture
+    end
+    return "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+local function BookOfCommands_GetOrCreateMacro(def)
+    BookOfCommands_EnsureDB()
+    local id = def and def.id
+    local existingName = Forged_MangosbotMacroDB[id]
+    if type(existingName) == "string" then
+        local existingIndex = GetMacroIndexByName(existingName)
+        if existingIndex and existingIndex > 0 then
+            return existingIndex
+        end
+    end
+    local macroName = BookOfCommands_MacroNameFor(def)
+    local macroBody = "/script Forged_Mangosbot_BookOfCommandsRun('" .. id .. "')"
+    local macroIcon = BookOfCommands_MacroIconFor(id)
+    local existingByName = GetMacroIndexByName(macroName)
+    if existingByName and existingByName > 0 then
+        EditMacro(existingByName, macroName, macroIcon, macroBody)
+        Forged_MangosbotMacroDB[id] = macroName
+        return existingByName
+    end
+    if type(GetNumMacros) == "function" then
+        local globalCount, characterCount = GetNumMacros()
+        if (globalCount or 0) + (characterCount or 0) >= MACRO_LIMIT then
+            BookOfCommands_Print("Forged_Mangosbot: no free macro slots to place this command on the action bar.")
+            return nil
+        end
+    end
+    -- Prefer a global (account-wide) macro so dragging a command does not
+    -- clutter your per-character macro list. Only fall back to a character
+    -- macro if no global slot is available.
+    local macroIndex = CreateMacro(macroName, macroIcon, macroBody, false, false)
+    if not macroIndex or macroIndex == 0 then
+        macroIndex = CreateMacro(macroName, macroIcon, macroBody, false, true)
+    end
+    if macroIndex and macroIndex > 0 then
+        Forged_MangosbotMacroDB[id] = macroName
+        return macroIndex
+    end
+    return nil
+end
+
+local function BookOfCommands_PickUp(def)
+    local macroIndex = BookOfCommands_GetOrCreateMacro(def)
+    if macroIndex and macroIndex > 0 and type(PickupMacro) == "function" then
+        PickupMacro(macroIndex)
+    end
+end
+
 local function BookOfCommands_SetNativeSpellbookWidgetsShown(shown)
     local i
 
@@ -79,9 +266,11 @@ local function BookOfCommands_SetNativeSpellbookWidgetsShown(shown)
 end
 
 local function BookOfCommands_UpdatePage()
-    local maxPage = math.max(1, totalPages)
-    if currentPage > maxPage then
-        currentPage = maxPage
+    local commands = BookOfCommands_GetMovementCommands()
+    local total = table.getn(commands)
+    totalPages = math.max(1, math.ceil(total / socketsPerPage))
+    if currentPage > totalPages then
+        currentPage = totalPages
     end
 
     local pageText = getglobal("Forged_Mangosbot_BookOfCommandsFramePageText")
@@ -96,37 +285,123 @@ local function BookOfCommands_UpdatePage()
         if currentPage > 1 then prevButton:Enable() else prevButton:Disable() end
     end
     if nextButton then
-        if currentPage < maxPage then nextButton:Enable() else nextButton:Disable() end
+        if currentPage < totalPages then nextButton:Enable() else nextButton:Disable() end
     end
 
-    -- No command data is bound to Movement yet, so every socket renders empty.
+    -- Bind the movement commands to the sockets so clicking one runs
+    -- it directly (action button behavior).
+    local startIndex = (currentPage - 1) * socketsPerPage + 1
     local i
     for i = 1, table.getn(socketButtons) do
         local socket = socketButtons[i]
-        socket.icon:Hide()
+        local def = commands[startIndex + i - 1]
+
+        if def then
+            socket.def = def
+            socket.icon:SetTexture(BookOfCommands_MacroTexture(def))
+            socket.icon:Show()
+            if socket.nameText then
+                socket.nameText:SetText(def.label or def.tooltip or def.id or "")
+            end
+            -- Only filled sockets are interactive; re-enable mouse for them.
+            socket:EnableMouse(true)
+        else
+            socket.def = nil
+            socket.icon:SetTexture(nil)
+            socket.icon:Hide()
+            if socket.nameText then
+                socket.nameText:SetText("")
+            end
+            -- Empty sockets must not be hoverable or clickable.
+            socket:EnableMouse(false)
+        end
     end
 end
 
 local function BookOfCommands_CreateSocket(parent, left, top, width, height)
     local button = CreateFrame("Button", nil, parent)
-    button:SetWidth(width)
-    button:SetHeight(height)
-    button:SetPoint("TOPLEFT", parent, "TOPLEFT", left, top)
+    button:SetWidth(width + 4)
+    button:SetHeight(height + 4)
+    button:EnableMouse(true)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForDrag("LeftButton")
+    -- Move the command button (hover area + icon) 12px left and 11px up from
+    -- the slot; the slot background is counter-shifted below so it stays put.
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", left - 12, top + 11)
 
     -- Native spell buttons have a small hit box but a larger decorative slot art; match that look.
+    -- (10, -10) shifts the decorative slot 1px left/up of its aligned position.
     button.slotBackground = button:CreateTexture(nil, "BACKGROUND")
     button.slotBackground:SetTexture("Interface\\Spellbook\\UI-Spellbook-SpellBackground")
     button.slotBackground:SetWidth(64)
     button.slotBackground:SetHeight(64)
-    button.slotBackground:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.slotBackground:SetPoint("CENTER", button, "CENTER", 11, -10)
+
+    -- The quickslot frame over the socket. In the spellbook (patch.MPQ's
+    -- SpellBookFrame.xml) this is $parentNormalTexture = UI-Quickslot2, 64x64,
+    -- centered, and it draws ABOVE the background but BELOW the icon (the icon is
+    -- in the BORDER layer). Matching that here: BORDER layer so the crisp
+    -- spellbackground stays visible and the icon renders on top, as in the game.
+    button.emptySlot = button:CreateTexture(nil, "BORDER")
+    button.emptySlot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    button.emptySlot:SetWidth(64)
+    button.emptySlot:SetHeight(64)
+    button.emptySlot:SetPoint("CENTER", button, "CENTER", 0, 1)
 
     button.icon = button:CreateTexture(nil, "ARTWORK")
-    button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
-    button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -1)
+    button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 2)
     button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     button.icon:Hide()
 
+    -- Command label to the right of the slot, matching the native spellbook's
+    -- spellname geometry exactly (read from SpellBookFrame.xml):
+    --   font:        GameFontNormal
+    --   size:        103 wide
+    --   anchor:      LEFT of the text at the button's RIGHT, offset (4, 4)
+    --   justifyH:    LEFT
+    button.nameText = button:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    button.nameText:SetWidth(103)
+    button.nameText:SetPoint("LEFT", button, "RIGHT", 4, 4)
+    button.nameText:SetJustifyH("LEFT")
+    button.nameText:SetText("")
+
     button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+
+    button:SetScript("OnEnter", function()
+        if this.def then
+            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+            -- Title in white (short command name, e.g. "Stay").
+            GameTooltip:SetText(this.def.label or this.def.tooltip or this.def.id, 1, 1, 1)
+            -- Description in yellow.
+            GameTooltip:AddLine(this.def.tooltip or "", 1, 0.82, 0)
+            GameTooltip:Show()
+        end
+    end)
+
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    -- Action button: a single click issues the command directly. The group
+    -- movement commands carry group=true, so they command the whole party.
+    button:SetScript("OnClick", function()
+        if arg1 ~= "LeftButton" then
+            return
+        end
+        if this.def and type(ToolBarButtonOnClick) == "function" then
+            ToolBarButtonOnClick(this.def, false)
+        end
+    end)
+
+    -- Left-click and drag picks up a macro for the command so the player can
+    -- drop it on an action bar. The macro is named after the command's label
+    -- ("Follow" / "Stay").
+    button:SetScript("OnDragStart", function()
+        if this.def then
+            BookOfCommands_PickUp(this.def)
+        end
+    end)
 
     return button
 end
@@ -143,6 +418,20 @@ local function BookOfCommands_CreateMovementTab(parent)
     tab.bg:SetHeight(64)
     tab.bg:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, 11)
 
+    -- Show the same icon as the native "General" skill-line section tab, so the
+    -- Group Orders section tab matches the first section tab in the spellbook.
+    -- Sized to match the native section tab (which is on the order of 24x24).
+    tab.icon = tab:CreateTexture(nil, "ARTWORK")
+    tab.icon:SetWidth(32)
+    tab.icon:SetHeight(32)
+    tab.icon:SetPoint("CENTER", tab, "CENTER", 0, 0)
+    if type(GetSpellTabInfo) == "function" then
+        local _, generalIcon = GetSpellTabInfo(1)
+        if type(generalIcon) == "string" then
+            tab.icon:SetTexture(generalIcon)
+        end
+    end
+
     tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
     tab:SetChecked(true)
@@ -150,7 +439,11 @@ local function BookOfCommands_CreateMovementTab(parent)
     tab.tooltipText = "Movement"
 
     tab:SetScript("OnEnter", function()
-        GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+        local iconWidth = 0
+        if this.icon and this.icon.GetWidth then
+            iconWidth = this.icon:GetWidth() or 0
+        end
+        GameTooltip:SetOwner(this, "ANCHOR_TOPLEFT", iconWidth, 0)
         GameTooltip:SetText(this.tooltipText)
         GameTooltip:Show()
     end)
@@ -182,7 +475,7 @@ local function BookOfCommands_BuildFrame()
 
     local titleText = bocFrame:CreateFontString("Forged_Mangosbot_BookOfCommandsFrameTitleText", "ARTWORK", "GameFontNormal")
     titleText:SetPoint("TOP", bocFrame, "TOP", 0, -20)
-    titleText:SetText("Book of Commands")
+    titleText:SetText("Group Orders")
 
     -- Match the native spellbook page indicator exactly (font, size and
     -- position). The native SpellBookPageText uses GameFontNormal, is 102 wide
@@ -348,7 +641,7 @@ function BookOfCommands.SetupSpellbookTabs()
         bocTab:SetPoint("LEFT", nativeTab, "RIGHT", -16, 0)
         local bocTabText = getglobal("SpellBookFrameTab2Text") or bocTab.text
         if bocTabText then
-            bocTabText:SetText("Commands")
+            bocTabText:SetText("Orders")
         end
         if type(PanelTemplates_TabResize) == "function" then
             PanelTemplates_TabResize(0, bocTab)
