@@ -999,11 +999,39 @@ function CompanionList.Init(parent)
     return panelFrame
 end
 
+-- Apply the Friends panel's corner/background textures to the Friends frame.
+-- The native FriendsFrame_Update swaps these four textures on every tab switch,
+-- so when we activate our own Companions tab we must set them explicitly to the
+-- friends theme or they keep whatever the previous tab left behind. The same
+-- four texture globals (and paths) the Friends tab (selectedTab == 1) uses.
+local function CompanionList_SetFriendsTheme()
+    local pairsToSet = {
+        { "FriendsFrameTopLeft", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopLeft" },
+        { "FriendsFrameTopRight", "Interface\\PaperDollInfoFrame\\UI-Character-General-TopRight" },
+        { "FriendsFrameBottomLeft", "Interface\\FriendsFrame\\UI-FriendsFrame-BotLeft" },
+        { "FriendsFrameBottomRight", "Interface\\FriendsFrame\\UI-FriendsFrame-BotRight" }
+    }
+    local i
+
+    for i = 1, table.getn(pairsToSet) do
+        local name = pairsToSet[i][1]
+        local path = pairsToSet[i][2]
+        local tex = getglobal(name)
+        if tex and tex.SetTexture then
+            tex:SetTexture(path)
+        end
+    end
+end
+
 local function CompanionList_ShowSocialSubFrame()
     local friendsFrame = getglobal("FriendsFrame")
     if not friendsFrame then
         return
     end
+
+    -- Give our panel the Friends tab's background so it does not inherit
+    -- the corner art from whichever tab was active before.
+    CompanionList_SetFriendsTheme()
 
     if type(FriendsFrame_ShowSubFrame) == "function" and type(FRIENDSFRAME_SUBFRAMES) == "table" then
         FriendsFrame_ShowSubFrame(socialSubFrameName)
